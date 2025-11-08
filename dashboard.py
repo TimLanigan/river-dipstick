@@ -1,0 +1,116 @@
+import streamlit as st
+import sqlite3
+import pandas as pd
+import time
+import json  # New: For loading rules from JSON
+
+DB_FILE = '/home/river_levels_app/river_levels.db'
+RULES_FILE = '/home/river_levels_app/rules.json'  # Absolute path to JSON
+
+# Load rules from JSON (do this once outside functions)
+try:
+    with open(RULES_FILE, 'r') as f:
+        RULES = json.load(f)
+except FileNotFoundError:
+    RULES = {}  # Fallback if file missing
+    st.warning("rules.json not found—color-coding disabled.")
+
+def get_latest_readings():
+    """Query DB for the latest reading per station."""
+    conn = sqlite3.connect(DB_FILE)
+    query = """
+        SELECT station_id, river, label, level, timestamp
+        FROM readings
+        WHERE id IN (
+            SELECT MAX(id) FROM readings GROUP BY station_id
+        )
+        ORDER BY river, label
+    """
+    df = pd.read_sql_query(query, conn)
+    conn.close()
+    return df
+
+# Optional auto-refresh
+REFRESH_INTERVAL = 60  # seconds
+if 'last_refresh' not in st.session_state:
+    st.session_state.last_refresh = time.time()
+
+if time.time() - st.session_state.last_refresh > REFRESH_INTERVAL:
+    st.session_state.last_refresh = time.time()
+    st.rerun()
+
+st.title("Top Secret NW River Dashboard")
+st.write("red = shit levels, stay at home")
+st.write("yellow = maybe worth a cast")
+st.write("green = ideal level for fly fishing")
+
+if st.button("Refresh Data"):
+    st.rerun()
+
+df = get_latest_readings()
+if not df.empty:
+    # Updated: Styling function now uses loaded RULES
+    def apply_styles(row):
+        styles = [''] * len(row)
+        level_idx = row.index.get_loc('level')
+        station_id = row['station_id']
+        level = row['level']
+        
+        if station_id in RULES:
+            for rule in RULES[station_id]:
+                min_val = rule['min']
+                max_val = rule['max'] if rule['max'] is not None else float('inf')
+                if min_val <= level < max_val:  # Use < for upper bound to avoid overlap
+                    color = rule['color']
+                    # Map color to CSS (adjust for readability)
+                    if color == 'red':
+                        styles[level_idx] = 'background-color: red; color: white;'
+                    elif color == 'yellow':
+                        styles[level_idx] = 'background-color: yellow; color: black;'
+                    elif color == 'lightgreen':
+                        styles[level_idx] = 'background-color: lightgreen; color: black;'
+                    # Add more color mappings if needed
+                    break  # Stop after first match
+        
+        return styles
+
+    # Custom orders: station IDs from source to sea
+    RIBBLE_ORDER = ['710151', '710102', '710103', '710301', '710305', '713056', '713040', '713019', '713030', '713354']
+    EDEN_ORDER = ['760101', '760112', '760115', '760502', '762505', '762600', '765512', '762540']
+
+    # Split into two DataFrames
+    df_ribble = df[df['river'] == 'Ribble'].copy()
+    df_eden = df[df['river'] == 'Eden'].copy()
+
+    # Sort Ribble by custom order
+    if not df_ribble.empty:
+        df_ribble['sort_order'] = pd.Categorical(df_ribble['station_id'], categories=RIBBLE_ORDER, ordered=True)
+        df_ribble = df_ribble.sort_values('sort_order').drop('sort_order', axis=1)
+        # Rename columns as requested
+        df_ribble = df_ribble.rename(columns={'river': 'River', 'label': 'Station'})
+        # Reorder columns
+        df_ribble = df_ribble[['River', 'Station', 'level', 'timestamp', 'station_id']]
+        st.subheader("River Ribble")
+        styled_ribble = df_ribble.style.apply(apply_styles, axis=1).format({"level": "{:.2f}m"})
+        styled_ribble = styled_ribble.hide(['station_id'], axis="columns").hide(axis="index")
+        st.dataframe(styled_ribble)
+
+    # Sort Eden by custom order
+    if not df_eden.empty:
+        df_eden['sort_order'] = pd.Categorical(df_eden['station_id'], categories=EDEN_ORDER, ordered=True)
+        df_eden = df_eden.sort_values('sort_order').drop('sort_order', axis=1)
+        # Rename columns as requested
+        df_eden = df_eden.rename(columns={'river': 'River', 'label': 'Station'})
+        # Reorder columns
+        df_eden = df_eden[['River', 'Station', 'level', 'timestamp', 'station_id']]
+        st.subheader("River Eden")
+        styled_eden = df_eden.style.apply(apply_styles, axis=1).format({"level": "{:.2f}m"})
+        styled_eden = styled_eden.hide(['station_id'], axis="columns").hide(axis="index")
+        st.dataframe(styled_eden)
+
+    # Removed the Level Visualization bar chart as requested
+else:
+    st.write("No data available yet. Run the collection script first.")
+
+st.write("Data sourced from UK Environment Agency API. Last updated: " + pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S'))
+st.write("vibe coded by tim.")
