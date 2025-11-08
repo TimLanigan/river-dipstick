@@ -1,0 +1,24 @@
+# Virtual environment (ignore all Python deps)
+env/
+
+# Database files
+river_levels.db
+*.db
+
+# Logs and temp files
+log.txt
+*.log
+*.txt  # If you have other text logs; adjust if you want to track specific ones
+nohup.out
+.streamlit/
+
+# Python cache and bytecode
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Other backups/temp
+*.bak
+*.swp
+*.tmp
