@@ -41,8 +41,8 @@ if time.time() - st.session_state.last_refresh > REFRESH_INTERVAL:
     st.session_state.last_refresh = time.time()
     st.rerun()
 
-st.title("Top Secret NW River Dashboard")
-st.write("red = shit levels, stay at home")
+st.title("Top Secret NW River Dipstick")
+st.write("red = bad levels, stay at home")
 st.write("yellow = maybe worth a cast")
 st.write("green = ideal level for fly fishing")
 
@@ -94,8 +94,8 @@ if not df.empty:
         df_ribble = df_ribble[['River', 'Station', 'level', 'timestamp', 'station_id']]
         st.subheader("River Ribble")
         styled_ribble = df_ribble.style.apply(apply_styles, axis=1).format({"level": "{:.2f}m", "timestamp": "{:%d-%m-%Y %I:%M %p}"})
-        styled_ribble = styled_ribble.hide(subset=['station_id'], axis="columns").hide(axis="index")
-        st.dataframe(styled_ribble)
+        styled_ribble = styled_ribble.hide(subset=['station_id'], axis="columns")
+        st.dataframe(styled_ribble, hide_index=True)
 
     # Sort Eden by custom order
     if not df_eden.empty:
@@ -107,10 +107,9 @@ if not df.empty:
         df_eden = df_eden[['River', 'Station', 'level', 'timestamp', 'station_id']]
         st.subheader("River Eden")
         styled_eden = df_eden.style.apply(apply_styles, axis=1).format({"level": "{:.2f}m", "timestamp": "{:%d-%m-%Y %I:%M %p}"})
-        styled_eden = styled_eden.hide(subset=['station_id'], axis="columns").hide(axis="index")
-        st.dataframe(styled_eden)
+        styled_eden = styled_eden.hide(subset=['station_id'], axis="columns")
+        st.dataframe(styled_eden, hide_index=True)
 
-    # Removed the Level Visualization bar chart as requested
 else:
     st.write("No data available yet. Run the collection script first.")
 

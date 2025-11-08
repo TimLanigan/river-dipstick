@@ -69,7 +69,6 @@ stations = {
     '710102': ('Ribble', 'Penny Bridge'),
     '710151': ('Ribble', 'Locks Weir'),
     '710103': ('Ribble', 'Arnford Weir'),
-    '713354': ('Ribble', 'Penwortham'),
     
     # River Eden
     '760502': ('Eden', 'Temple Sowerby'),
