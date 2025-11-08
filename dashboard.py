@@ -28,6 +28,8 @@ def get_latest_readings():
     """
     df = pd.read_sql_query(query, conn)
     conn.close()
+    # Convert timestamp to datetime for formatting
+    df['timestamp'] = pd.to_datetime(df['timestamp'])
     return df
 
 # Optional auto-refresh
@@ -40,7 +42,7 @@ if time.time() - st.session_state.last_refresh > REFRESH_INTERVAL:
     st.rerun()
 
 st.title("Top Secret NW River Dashboard")
-st.write("red = bad levels, stay at home")
+st.write("red = shit levels, stay at home")
 st.write("yellow = maybe worth a cast")
 st.write("green = ideal level for fly fishing")
 
@@ -88,11 +90,15 @@ if not df.empty:
         df_ribble = df_ribble.sort_values('sort_order').drop('sort_order', axis=1)
         # Rename columns as requested
         df_ribble = df_ribble.rename(columns={'river': 'River', 'label': 'Station'})
-        # Reorder columns
+        # Reorder columns (keep station_id for styling, but hide later)
         df_ribble = df_ribble[['River', 'Station', 'level', 'timestamp', 'station_id']]
         st.subheader("River Ribble")
-        styled_ribble = df_ribble.style.apply(apply_styles, axis=1).format({"level": "{:.2f}m"})
-        styled_ribble = styled_ribble.hide(['station_id'], axis="columns").hide(axis="index")
+        styled_ribble = df_ribble.style.apply(apply_styles, axis=1).format({"level": "{:.2f}m", "timestamp": "{:%d-%m-%Y %I:%M %p}"})
+        styled_ribble = styled_ribble.set_table_styles([
+            {"selector": "th.col4, td.col4", "props": "display: none;"},
+            {"selector": "th.row_heading, td.row_heading", "props": "display: none;"},
+            {"selector": "th.blank", "props": "display: none;"}
+        ])
         st.dataframe(styled_ribble)
 
     # Sort Eden by custom order
@@ -101,11 +107,15 @@ if not df.empty:
         df_eden = df_eden.sort_values('sort_order').drop('sort_order', axis=1)
         # Rename columns as requested
         df_eden = df_eden.rename(columns={'river': 'River', 'label': 'Station'})
-        # Reorder columns
+        # Reorder columns (keep station_id for styling, but hide later)
         df_eden = df_eden[['River', 'Station', 'level', 'timestamp', 'station_id']]
         st.subheader("River Eden")
-        styled_eden = df_eden.style.apply(apply_styles, axis=1).format({"level": "{:.2f}m"})
-        styled_eden = styled_eden.hide(['station_id'], axis="columns").hide(axis="index")
+        styled_eden = df_eden.style.apply(apply_styles, axis=1).format({"level": "{:.2f}m", "timestamp": "{:%d-%m-%Y %I:%M %p}"})
+        styled_eden = styled_eden.set_table_styles([
+            {"selector": "th.col4, td.col4", "props": "display: none;"},
+            {"selector": "th.row_heading, td.row_heading", "props": "display: none;"},
+            {"selector": "th.blank", "props": "display: none;"}
+        ])
         st.dataframe(styled_eden)
 
     # Removed the Level Visualization bar chart as requested
