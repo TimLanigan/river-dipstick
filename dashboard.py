@@ -41,10 +41,8 @@ if time.time() - st.session_state.last_refresh > REFRESH_INTERVAL:
     st.session_state.last_refresh = time.time()
     st.rerun()
 
-st.title("Top Secret NW River Dipstick")
-st.write("red = bad levels, stay at home")
-st.write("yellow = maybe worth a cast")
-st.write("green = ideal level for fly fishing")
+st.title("NW River Dipstick")
+st.write("red = bad levels  |  yellow = maybe | green = go fly fishing")
 
 if st.button("Refresh Data"):
     st.rerun()
@@ -89,11 +87,11 @@ if not df.empty:
         df_ribble['sort_order'] = pd.Categorical(df_ribble['station_id'], categories=RIBBLE_ORDER, ordered=True)
         df_ribble = df_ribble.sort_values('sort_order').drop('sort_order', axis=1)
         # Rename columns as requested
-        df_ribble = df_ribble.rename(columns={'river': 'River', 'label': 'Station'})
+        df_ribble = df_ribble.rename(columns={'river': 'River', 'label': 'Station', 'timestamp': 'Latest Reading'})
         # Reorder columns (keep station_id for styling, but hide later)
-        df_ribble = df_ribble[['River', 'Station', 'level', 'timestamp', 'station_id']]
+        df_ribble = df_ribble[['River', 'Station', 'level', 'Latest Reading', 'station_id']]
         st.subheader("River Ribble")
-        styled_ribble = df_ribble.style.apply(apply_styles, axis=1).format({"level": "{:.2f}m", "timestamp": "{:%d-%m-%Y %I:%M %p}"})
+        styled_ribble = df_ribble.style.apply(apply_styles, axis=1).format({"level": "{:.2f}m", "Latest Reading": "{:%H:%M  |  %d-%m-%Y}"})
         styled_ribble = styled_ribble.hide(subset=['station_id'], axis="columns")
         st.dataframe(styled_ribble, hide_index=True)
 
@@ -102,16 +100,16 @@ if not df.empty:
         df_eden['sort_order'] = pd.Categorical(df_eden['station_id'], categories=EDEN_ORDER, ordered=True)
         df_eden = df_eden.sort_values('sort_order').drop('sort_order', axis=1)
         # Rename columns as requested
-        df_eden = df_eden.rename(columns={'river': 'River', 'label': 'Station'})
+        df_eden = df_eden.rename(columns={'river': 'River', 'label': 'Station', 'timestamp': 'Latest Reading'})
         # Reorder columns (keep station_id for styling, but hide later)
-        df_eden = df_eden[['River', 'Station', 'level', 'timestamp', 'station_id']]
+        df_eden = df_eden[['River', 'Station', 'level', 'Latest Reading', 'station_id']]
         st.subheader("River Eden")
-        styled_eden = df_eden.style.apply(apply_styles, axis=1).format({"level": "{:.2f}m", "timestamp": "{:%d-%m-%Y %I:%M %p}"})
+        styled_eden = df_eden.style.apply(apply_styles, axis=1).format({"level": "{:.2f}m", "Latest Reading": "{:%H:%M  |  %d-%m-%Y}"})
         styled_eden = styled_eden.hide(subset=['station_id'], axis="columns")
         st.dataframe(styled_eden, hide_index=True)
 
 else:
     st.write("No data available yet. Run the collection script first.")
 
-st.write("Data sourced from UK Environment Agency API. Last updated: " + pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S'))
+st.write("Data sourced from UK Environment Agency API. Last updated: " + pd.Timestamp.now().strftime('%Y-%m-%d @ %H:%M'))
 st.write("vibe coded by tim.")
