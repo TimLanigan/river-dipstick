@@ -42,10 +42,7 @@ if time.time() - st.session_state.last_refresh > REFRESH_INTERVAL:
     st.rerun()
 
 st.title("NW River Dipstick")
-st.write("red = bad levels  |  yellow = maybe | green = go fly fishing")
-
-if st.button("Refresh Data"):
-    st.rerun()
+st.write("Powered by gut instinct & AI.")
 
 df = get_latest_readings()
 if not df.empty:
@@ -91,7 +88,7 @@ if not df.empty:
         # Reorder columns (keep station_id for styling, but hide later)
         df_ribble = df_ribble[['River', 'Station', 'level', 'Latest Reading', 'station_id']]
         st.subheader("River Ribble")
-        styled_ribble = df_ribble.style.apply(apply_styles, axis=1).format({"level": "{:.2f}m", "Latest Reading": "{:%H:%M  |  %d-%m-%Y}"})
+        styled_ribble = df_ribble.style.apply(apply_styles, axis=1).format({"level": "{:.2f}m", "Latest Reading": "{:%d-%m-%Y @ %H:%M}"})
         styled_ribble = styled_ribble.hide(subset=['station_id'], axis="columns")
         st.dataframe(styled_ribble, hide_index=True)
 
@@ -104,12 +101,17 @@ if not df.empty:
         # Reorder columns (keep station_id for styling, but hide later)
         df_eden = df_eden[['River', 'Station', 'level', 'Latest Reading', 'station_id']]
         st.subheader("River Eden")
-        styled_eden = df_eden.style.apply(apply_styles, axis=1).format({"level": "{:.2f}m", "Latest Reading": "{:%H:%M  |  %d-%m-%Y}"})
+        styled_eden = df_eden.style.apply(apply_styles, axis=1).format({"level": "{:.2f}m", "Latest Reading": "{:%d-%m-%Y @ %H:%M}"})
         styled_eden = styled_eden.hide(subset=['station_id'], axis="columns")
         st.dataframe(styled_eden, hide_index=True)
 
 else:
     st.write("No data available yet. Run the collection script first.")
+st.write("Key:")
+st.write("red = bad level, stay at home")
+st.write("yellow = might be worth a cast")
+st.write("green = perfect level for fly fishing")
 
-st.write("Data sourced from UK Environment Agency API. Last updated: " + pd.Timestamp.now().strftime('%Y-%m-%d @ %H:%M'))
-st.write("vibe coded by tim.")
+st.write("Data refreshed:  " + pd.Timestamp.now().strftime('%d-%m-%Y @ %H:%M'))
+st.write("Data source: [Environment Agency API](https://environment.data.gov.uk/flood-monitoring/doc/reference) ")
+st.write("Built using [streamlit.io](https://streamlit.io) & vibe coded by tim.")
