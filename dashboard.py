@@ -40,7 +40,7 @@ if time.time() - st.session_state.last_refresh > REFRESH_INTERVAL:
     st.rerun()
 
 st.title("Top Secret NW River Dashboard")
-st.write("red = shit levels, stay at home")
+st.write("red = bad levels, stay at home")
 st.write("yellow = maybe worth a cast")
 st.write("green = ideal level for fly fishing")
 
