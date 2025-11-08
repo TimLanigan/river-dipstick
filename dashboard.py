@@ -94,11 +94,7 @@ if not df.empty:
         df_ribble = df_ribble[['River', 'Station', 'level', 'timestamp', 'station_id']]
         st.subheader("River Ribble")
         styled_ribble = df_ribble.style.apply(apply_styles, axis=1).format({"level": "{:.2f}m", "timestamp": "{:%d-%m-%Y %I:%M %p}"})
-        styled_ribble = styled_ribble.set_table_styles([
-            {"selector": "th.col4, td.col4", "props": "display: none;"},
-            {"selector": "th.row_heading, td.row_heading", "props": "display: none;"},
-            {"selector": "th.blank", "props": "display: none;"}
-        ])
+        styled_ribble = styled_ribble.hide(subset=['station_id'], axis="columns").hide(axis="index")
         st.dataframe(styled_ribble)
 
     # Sort Eden by custom order
@@ -111,11 +107,7 @@ if not df.empty:
         df_eden = df_eden[['River', 'Station', 'level', 'timestamp', 'station_id']]
         st.subheader("River Eden")
         styled_eden = df_eden.style.apply(apply_styles, axis=1).format({"level": "{:.2f}m", "timestamp": "{:%d-%m-%Y %I:%M %p}"})
-        styled_eden = styled_eden.set_table_styles([
-            {"selector": "th.col4, td.col4", "props": "display: none;"},
-            {"selector": "th.row_heading, td.row_heading", "props": "display: none;"},
-            {"selector": "th.blank", "props": "display: none;"}
-        ])
+        styled_eden = styled_eden.hide(subset=['station_id'], axis="columns").hide(axis="index")
         st.dataframe(styled_eden)
 
     # Removed the Level Visualization bar chart as requested
