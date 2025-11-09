@@ -105,13 +105,13 @@ if not df.empty:
         df_ribble = df_ribble.rename(columns={'river': 'River', 'label': 'Station', 'timestamp': 'Latest Reading'})
         # Reorder columns (keep station_id for styling, but hide later)
         df_ribble = df_ribble[['River', 'Station', 'level', 'Latest Reading', 'station_id']]
-        st.subheader("River Ribble")
+        st.subheader("River Ribble - Current Readings")
         styled_ribble = df_ribble.style.apply(apply_styles, axis=1).format({"level": "{:.2f}m", "Latest Reading": "{:%d-%m-%Y @ %H:%M}"})
         styled_ribble = styled_ribble.hide(subset=['station_id'], axis="columns")
         st.dataframe(styled_ribble, hide_index=True)
 
         # Add historical chart for each Ribble station
-        st.subheader("Historical Levels (Last 7 Days) - Ribble")
+        st.subheader("River Ribble - Historical Levels (Last 7 Days)")
         for index, row in df_ribble.iterrows():
             st.write(f"### {row['Station']}")
             hist_df = get_historical_data(row['station_id'])
@@ -128,13 +128,13 @@ if not df.empty:
         df_eden = df_eden.rename(columns={'river': 'River', 'label': 'Station', 'timestamp': 'Latest Reading'})
         # Reorder columns (keep station_id for styling, but hide later)
         df_eden = df_eden[['River', 'Station', 'level', 'Latest Reading', 'station_id']]
-        st.subheader("River Eden")
+        st.subheader("River Eden - Current Readings")
         styled_eden = df_eden.style.apply(apply_styles, axis=1).format({"level": "{:.2f}m", "Latest Reading": "{:%d-%m-%Y @ %H:%M}"})
         styled_eden = styled_eden.hide(subset=['station_id'], axis="columns")
         st.dataframe(styled_eden, hide_index=True)
 
         # Add historical chart for each Eden station
-        st.subheader("Historical Levels (Last 7 Days) - Eden")
+        st.subheader("River Eden - Historical Levels (Last 7 Days)")
         for index, row in df_eden.iterrows():
             st.write(f"### {row['Station']}")
             hist_df = get_historical_data(row['station_id'])
