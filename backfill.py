@@ -1,6 +1,7 @@
 import requests
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
+import time  # For rate limiting sleep
 
 DB_FILE = '/home/river_levels_app/river_levels.db'
 
@@ -20,8 +21,8 @@ def insert_reading(station_id, river, label, level, timestamp):
         print(f"Duplicate reading for {station_id} at {timestamp} skipped")
     conn.close()
 
-def fetch_historical_readings(station_id, start_date, end_date):
-    """Fetches readings for a date range."""
+def fetch_historical_readings(station_id, start_date):
+    """Fetches readings since a start date (up to now)."""
     url = f"https://environment.data.gov.uk/flood-monitoring/id/stations/{station_id}/readings?parameter=level&since={start_date}&_sorted"
     readings = []
     try:
@@ -30,9 +31,7 @@ def fetch_historical_readings(station_id, start_date, end_date):
         data = response.json()
         if 'items' in data:
             for item in data['items']:
-                ts = item['dateTime']
-                if ts < end_date:  # Filter to range (API 'since' is start only)
-                    readings.append((item['value'], ts))
+                readings.append((item['value'], item['dateTime']))
         return readings
     except requests.RequestException as e:
         print(f"Error fetching for {station_id}: {e}")
@@ -59,20 +58,21 @@ stations = {
     '760112': ('Eden', 'Great Musgrave Bridge')
 }
 
-# Backfill settings (adjust days_back as needed)
+# Backfill settings (adjust days_back as needed; smaller for testing)
 days_back = 365
-end_date = datetime.utcnow().isoformat() + 'Z'
-start_date_base = (datetime.utcnow() - timedelta(days=days_back)).isoformat() + 'Z'
+now = datetime.now(UTC)
+start_date_base = now - timedelta(days=days_back)
 
 for station_id, (river, label) in stations.items():
     print(f"Backfilling {station_id}...")
-    current_start = datetime.fromisoformat(start_date_base[:-1])  # Remove Z for calc
-    while current_start < datetime.utcnow():
-        chunk_end = min(current_start + timedelta(days=30), datetime.utcnow())
-        chunk_start_str = current_start.isoformat() + 'Z'
-        chunk_end_str = chunk_end.isoformat() + 'Z'
-        readings = fetch_historical_readings(station_id, chunk_start_str, chunk_end_str)
+    current_start = start_date_base
+    while current_start < now:
+        chunk_end = min(current_start + timedelta(days=30), now)
+        chunk_start_str = current_start.strftime('%Y-%m-%dT%H:%M:%SZ')
+        readings = fetch_historical_readings(station_id, chunk_start_str)
         for level, timestamp in readings:
-            insert_reading(station_id, river, label, level, timestamp)
+            if timestamp >= chunk_start_str and timestamp < chunk_end.strftime('%Y-%m-%dT%H:%M:%SZ'):
+                insert_reading(station_id, river, label, level, timestamp)
         current_start = chunk_end
+        time.sleep(1)  # Rate limit: 1 second delay between calls
     print(f"Completed backfill for {station_id}")

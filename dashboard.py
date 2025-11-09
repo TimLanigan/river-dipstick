@@ -3,6 +3,7 @@ import sqlite3
 import pandas as pd
 import time
 import json  # New: For loading rules from JSON
+from datetime import datetime, timedelta  # Added for historical queries
 
 DB_FILE = '/home/river_levels_app/river_levels.db'
 RULES_FILE = '/home/river_levels_app/rules.json'  # Absolute path to JSON
@@ -30,6 +31,22 @@ def get_latest_readings():
     conn.close()
     # Convert timestamp to datetime for formatting
     df['timestamp'] = pd.to_datetime(df['timestamp'])
+    return df
+
+def get_historical_data(station_id, days=7):
+    """Query DB for historical levels for a station (last N days)."""
+    conn = sqlite3.connect(DB_FILE)
+    start_date = (datetime.now() - timedelta(days=days)).isoformat()
+    query = """
+        SELECT timestamp, level
+        FROM readings
+        WHERE station_id = ? AND timestamp >= ?
+        ORDER BY timestamp
+    """
+    df = pd.read_sql_query(query, conn, params=(station_id, start_date))
+    conn.close()
+    df['timestamp'] = pd.to_datetime(df['timestamp'])
+    df = df.set_index('timestamp')
     return df
 
 # Optional auto-refresh
@@ -72,8 +89,8 @@ if not df.empty:
         return styles
 
     # Custom orders: station IDs from source to sea
-    RIBBLE_ORDER = ['710151', '710102', '710103', '710301', '710305', '713056', '713040', '713019', '713030', '713354']
-    EDEN_ORDER = ['760101', '760112', '760115', '760502', '762505', '762600', '765512', '762540']
+    RIBBLE_ORDER = ['710151', '710102', '710103', '710301', '710305', '713056', '713040', '713354']
+    EDEN_ORDER = ['760101', '760112', '760115', '760502', '762505', '765512', '762540']
 
     # Split into two DataFrames
     df_ribble = df[df['river'] == 'Ribble'].copy()
@@ -92,6 +109,16 @@ if not df.empty:
         styled_ribble = styled_ribble.hide(subset=['station_id'], axis="columns")
         st.dataframe(styled_ribble, hide_index=True)
 
+        # Add historical chart for each Ribble station
+        st.subheader("Historical Levels (Last 7 Days) - Ribble")
+        for index, row in df_ribble.iterrows():
+            st.write(f"### {row['Station']}")
+            hist_df = get_historical_data(row['station_id'])
+            if not hist_df.empty:
+                st.line_chart(hist_df['level'])
+            else:
+                st.write("No historical data available.")
+
     # Sort Eden by custom order
     if not df_eden.empty:
         df_eden['sort_order'] = pd.Categorical(df_eden['station_id'], categories=EDEN_ORDER, ordered=True)
@@ -104,6 +131,16 @@ if not df.empty:
         styled_eden = df_eden.style.apply(apply_styles, axis=1).format({"level": "{:.2f}m", "Latest Reading": "{:%d-%m-%Y @ %H:%M}"})
         styled_eden = styled_eden.hide(subset=['station_id'], axis="columns")
         st.dataframe(styled_eden, hide_index=True)
+
+        # Add historical chart for each Eden station
+        st.subheader("Historical Levels (Last 7 Days) - Eden")
+        for index, row in df_eden.iterrows():
+            st.write(f"### {row['Station']}")
+            hist_df = get_historical_data(row['station_id'])
+            if not hist_df.empty:
+                st.line_chart(hist_df['level'])
+            else:
+                st.write("No historical data available.")
 
 else:
     st.write("No data available yet. Run the collection script first.")
