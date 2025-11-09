@@ -58,25 +58,7 @@ def insert_reading(station_id, river, label, level, timestamp):
 init_db()
 
 # All stations for River Ribble and River Eden
-stations = {
-    # River Ribble
-    '710301': ('Ribble', 'Low Moor'),
-    '713056': ('Ribble', 'New Jumbles Rock'),
-    '713040': ('Ribble', 'Ribchester School'),
-    '710305': ('Ribble', 'Henthorn'),
-    '710102': ('Ribble', 'Penny Bridge'),
-    '710151': ('Ribble', 'Locks Weir'),
-    '710103': ('Ribble', 'Arnford Weir'),
-    
-    # River Eden
-    '760502': ('Eden', 'Temple Sowerby'),
-    '760115': ('Eden', 'Appleby'),
-    '762540': ('Eden', 'Linstock'),
-    '762505': ('Eden', 'Great Corby'),
-    '760101': ('Eden', 'Kirkby Stephen'),
-    '765512': ('Eden', 'Sheepmount'),
-    '760112': ('Eden', 'Great Musgrave Bridge')
-}
+from river_reference import STATIONS as stations
 
 # Fetch and store data
 print(f"Collecting River Level Data as of {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")

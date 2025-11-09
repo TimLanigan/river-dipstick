@@ -38,25 +38,7 @@ def fetch_historical_readings(station_id, start_date):
         return []
 
 # All stations (from your baseline, excluding Penwortham if removed)
-stations = {
-    '710301': ('Ribble', 'Low Moor'),
-    '713056': ('Ribble', 'New Jumbles Rock'),
-    '713019': ('Ribble', 'Samlesbury'),
-    '713030': ('Ribble', 'Walton-Le-Dale'),
-    '713040': ('Ribble', 'Ribchester School'),
-    '710305': ('Ribble', 'Henthorn'),
-    '710102': ('Ribble', 'Penny Bridge'),
-    '710151': ('Ribble', 'Locks Weir'),
-    '710103': ('Ribble', 'Arnford Weir'),
-    '760502': ('Eden', 'Temple Sowerby'),
-    '760115': ('Eden', 'Appleby'),
-    '762600': ('Eden', 'Sands Centre, Carlisle'),
-    '762540': ('Eden', 'Linstock'),
-    '762505': ('Eden', 'Great Corby'),
-    '760101': ('Eden', 'Kirkby Stephen'),
-    '765512': ('Eden', 'Sheepmount'),
-    '760112': ('Eden', 'Great Musgrave Bridge')
-}
+from river_reference import STATIONS as stations
 
 # Backfill settings (adjust days_back as needed; smaller for testing)
 days_back = 365

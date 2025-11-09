@@ -4,6 +4,7 @@ import pandas as pd
 import time
 import json  # New: For loading rules from JSON
 from datetime import datetime, timedelta  # Added for historical queries
+from river_reference import STATIONS
 
 DB_FILE = '/home/river_levels_app/river_levels.db'
 RULES_FILE = '/home/river_levels_app/rules.json'  # Absolute path to JSON
@@ -89,7 +90,7 @@ if not df.empty:
         return styles
 
     # Custom orders: station IDs from source to sea
-    RIBBLE_ORDER = ['710151', '710102', '710103', '710301', '710305', '713056', '713040', '713354']
+    RIBBLE_ORDER = ['710151', '710102', '710103', '710301', '710305', '713056', '713040']
     EDEN_ORDER = ['760101', '760112', '760115', '760502', '762505', '765512', '762540']
 
     # Split into two DataFrames
