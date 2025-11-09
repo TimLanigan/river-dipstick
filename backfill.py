@@ -43,7 +43,7 @@ from river_reference import STATIONS as stations
 # Backfill settings (adjust days_back as needed; smaller for teeeesting)
 
 now = datetime.now(UTC)
-start_date = now - timedelta(days=30)
+start_date = now - timedelta(days=7)
 
 print ('now', str(now))
 print ('start_date', str(start_date))
@@ -52,7 +52,7 @@ for station_id, (river, label) in stations.items():
     print(f"Backfilling {station_id}...")
     current_start = start_date
     while current_start < now:
-        chunk_end = min(current_start + timedelta(days=31), now)
+        chunk_end = min(current_start + timedelta(days=1), now)
         chunk_start_str = current_start.strftime('%Y-%m-%dT%H:%M:%SZ')
         readings = fetch_historical_readings(station_id, chunk_start_str)
         for level, timestamp in readings:
