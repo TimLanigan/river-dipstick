@@ -142,12 +142,14 @@ if not df.empty:
                 st.line_chart(hist_df['level'])
             else:
                 st.write("No historical data available.")
-                
+
 else:
-    st.write("red = bad level, stay at home")
+    st.write("No data available yet. Run the collection script first.")
+# key
+st.write("red = bad level, stay at home")
 st.write("yellow = might be worth a cast")
 st.write("green = perfect level for fly fishing")
-# Footer text
+# footer
 st.write("Data refreshed:  " + pd.Timestamp.now().strftime('%d-%m-%Y @ %H:%M'))
 st.write("Data source: [Environment Agency API](https://environment.data.gov.uk/flood-monitoring/doc/reference) ")
 st.write("Built using [streamlit.io](https://streamlit.io) & vibe coded by tim.")
