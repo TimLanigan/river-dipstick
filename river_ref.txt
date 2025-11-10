@@ -18,3 +18,28 @@
 762600	Eden	Sands Centre, Carlisle
 765512	Eden	Sheepmount
 760502	Eden	Temple Sowerby
+
+
+
+'710301':
+'713056':
+'713040':
+'710305':
+'710102':
+'710151':
+'710103':
+
+sqlite3 river_levels.db "SELECT MIN(timestamp) FROM readings WHERE station_id = '710301';"
+sqlite3 river_levels.db "SELECT MIN(timestamp) FROM readings WHERE station_id = '713056';"
+sqlite3 river_levels.db "SELECT MIN(timestamp) FROM readings WHERE station_id = '713040';"
+sqlite3 river_levels.db "SELECT MIN(timestamp) FROM readings WHERE station_id = '710305';"
+sqlite3 river_levels.db "SELECT MIN(timestamp) FROM readings WHERE station_id = '710102';"
+sqlite3 river_levels.db "SELECT MIN(timestamp) FROM readings WHERE station_id = '710151';"
+sqlite3 river_levels.db "SELECT MIN(timestamp) FROM readings WHERE station_id = '710103';"
+sqlite3 river_levels.db "SELECT MIN(timestamp) FROM readings WHERE station_id = '760502';"
+sqlite3 river_levels.db "SELECT MIN(timestamp) FROM readings WHERE station_id = '760115';"
+sqlite3 river_levels.db "SELECT MIN(timestamp) FROM readings WHERE station_id = '762540';"
+sqlite3 river_levels.db "SELECT MIN(timestamp) FROM readings WHERE station_id = '762505';"
+sqlite3 river_levels.db "SELECT MIN(timestamp) FROM readings WHERE station_id = '760101';"
+sqlite3 river_levels.db "SELECT MIN(timestamp) FROM readings WHERE station_id = '765512';"
+sqlite3 river_levels.db "SELECT MIN(timestamp) FROM readings WHERE station_id = '760112';"

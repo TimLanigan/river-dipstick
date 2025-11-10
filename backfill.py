@@ -1,7 +1,7 @@
 import requests
 import sqlite3
-from datetime import datetime, timedelta, UTC
-import time  # For rate limiting sleep
+from datetime import datetime, timedelta
+import time
 
 DB_FILE = '/home/river_levels_app/river_levels.db'
 
@@ -24,9 +24,13 @@ def insert_reading(station_id, river, label, level, timestamp):
 def fetch_historical_readings(station_id, start_date):
     """Fetches readings since a start date (up to now)."""
     url = f"https://environment.data.gov.uk/flood-monitoring/id/stations/{station_id}/readings?parameter=level&since={start_date}&_sorted"
+    print(f"Fetching URL: {url}")  # Debug
     readings = []
     try:
         response = requests.get(url)
+        print(f"Response status: {response.status_code}")  # Debug
+        if response.status_code != 200:
+            print(f"Response text: {response.text}")  # Debug error
         response.raise_for_status()
         data = response.json()
         if 'items' in data:
@@ -37,27 +41,24 @@ def fetch_historical_readings(station_id, start_date):
         print(f"Error fetching for {station_id}: {e}")
         return []
 
-# All stations (from river reference)
+# All stations (from your reference)
 from river_reference import STATIONS as stations
 
-# Backfill settings (adjust days_back as needed; smaller for teeeesting)
-
-now = datetime.now(UTC)
-start_date = now - timedelta(days=7)
-
-print ('now', str(now))
-print ('start_date', str(start_date))
+# Backfill settings (API limit ~28 days)
+chunk_days = 7
+days_back = 14
+now = datetime.utcnow()
+start_date_base = now - timedelta(days=days_back)
 
 for station_id, (river, label) in stations.items():
     print(f"Backfilling {station_id}...")
-    current_start = start_date
+    current_start = start_date_base
     while current_start < now:
-        chunk_end = min(current_start + timedelta(days=1), now)
+        chunk_end = min(current_start + timedelta(days=chunk_days), now)
         chunk_start_str = current_start.strftime('%Y-%m-%dT%H:%M:%SZ')
         readings = fetch_historical_readings(station_id, chunk_start_str)
         for level, timestamp in readings:
-            if timestamp >= chunk_start_str and timestamp < chunk_end.strftime('%Y-%m-%dT%H:%M:%SZ'):
-                insert_reading(station_id, river, label, level, timestamp)
+            insert_reading(station_id, river, label, level, timestamp)
         current_start = chunk_end
-        time.sleep(1)  # Rate limit: 1 second delay between calls
+        time.sleep(1)  # Avoid rate limits
     print(f"Completed backfill for {station_id}")

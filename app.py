@@ -1,6 +1,7 @@
 import requests
 import sqlite3
 from datetime import datetime
+from river_reference import RIVERS; stations = {s['id']: ('Ribble', s['label']) for s in RIVERS['Ribble']} | {s['id']: ('Eden', s['label']) for s in RIVERS['Eden']}
 
 DB_FILE = '/home/river_levels_app/river_levels.db'
 
