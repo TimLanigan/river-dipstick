@@ -1,7 +1,9 @@
 import requests
 import sqlite3
 from datetime import datetime
-from river_reference import RIVERS; stations = {s['id']: ('Ribble', s['label']) for s in RIVERS['Ribble']} | {s['id']: ('Eden', s['label']) for s in RIVERS['Eden']}
+import time
+from river_reference import STATIONS
+
 
 DB_FILE = '/home/river_levels_app/river_levels.db'
 
@@ -59,12 +61,15 @@ def insert_reading(station_id, river, label, level, timestamp):
 init_db()
 
 # All stations for River Ribble and River Eden
-from river_reference import STATIONS as stations
+from river_reference import STATIONS
 
 # Fetch and store data
 print(f"Collecting River Level Data as of {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-for station_id, (river, label) in stations.items():
-    level, timestamp = get_latest_river_level(station_id)
+for river, station_list in STATIONS.items():
+    for station in station_list:
+        station_id = station['id']
+        label = station['label']
+        level, timestamp = get_latest_river_level(station_id)
     if level is not None:
         insert_reading(station_id, river, label, level, timestamp)
     else:

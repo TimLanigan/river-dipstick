@@ -2,7 +2,7 @@ import sqlite3
 import pandas as pd
 from datetime import datetime, timedelta
 from statsmodels.tsa.arima.model import ARIMA
-from river_reference import RIVERS
+from river_reference import STATIONS
 
 DB_FILE = '/home/river_levels_app/river_levels.db'
 
@@ -16,7 +16,7 @@ def get_historical_for_prediction(station_id):
         print(f"Not enough data for {station_id}")
         return None
     df['timestamp'] = pd.to_datetime(df['timestamp'])
-    df = df.set_index('timestamp').resample('H').mean().ffill()
+    df = df.set_index('timestamp').resample('h').mean().ffill()
     return df['level']
 
 def train_and_predict(station_id):
@@ -63,7 +63,7 @@ def review_performance(station_id):
     return 0.0
 
 # Run for all stations
-for river, station_list in RIVERS.items():
+for river, station_list in STATIONS.items():
     for station in station_list:
         station_id = station['id']
         review_performance(station_id)

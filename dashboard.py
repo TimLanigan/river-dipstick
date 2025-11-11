@@ -2,23 +2,22 @@ import streamlit as st
 import sqlite3
 import pandas as pd
 import time
-import json  # New: For loading rules from JSON
-from datetime import datetime, timedelta  # Added for historical queries
-from river_reference import STATIONS
+import json
+import altair as alt  # For advanced charts
+from datetime import datetime, timedelta
 
 DB_FILE = '/home/river_levels_app/river_levels.db'
-RULES_FILE = '/home/river_levels_app/rules.json'  # Absolute path to JSON
+RULES_FILE = '/home/river_levels_app/rules.json'
 
-# Load rules from JSON (do this once outside functions)
+# Load rules from JSON
 try:
     with open(RULES_FILE, 'r') as f:
         RULES = json.load(f)
 except FileNotFoundError:
-    RULES = {}  # Fallback if file missing
+    RULES = {}
     st.warning("rules.json not found—color-coding disabled.")
 
 def get_latest_readings():
-    """Query DB for the latest reading per station."""
     conn = sqlite3.connect(DB_FILE)
     query = """
         SELECT station_id, river, label, level, timestamp
@@ -30,12 +29,10 @@ def get_latest_readings():
     """
     df = pd.read_sql_query(query, conn)
     conn.close()
-    # Convert timestamp to datetime for formatting
     df['timestamp'] = pd.to_datetime(df['timestamp'])
     return df
 
 def get_historical_data(station_id, days=7):
-    """Query DB for historical levels for a station (last N days)."""
     conn = sqlite3.connect(DB_FILE)
     start_date = (datetime.now() - timedelta(days=days)).isoformat()
     query = """
@@ -50,8 +47,18 @@ def get_historical_data(station_id, days=7):
     df = df.set_index('timestamp')
     return df
 
+def get_predictions(station_id):
+    conn = sqlite3.connect(DB_FILE)
+    query = "SELECT predicted_for, predicted_level FROM predictions WHERE station_id = ? ORDER BY predicted_for"
+    df = pd.read_sql_query(query, conn, params=(station_id,))
+    conn.close()
+    if not df.empty:
+        df['predicted_for'] = pd.to_datetime(df['predicted_for'])
+        df = df.set_index('predicted_for')
+    return df
+
 # Optional auto-refresh
-REFRESH_INTERVAL = 60  # seconds
+REFRESH_INTERVAL = 60
 if 'last_refresh' not in st.session_state:
     st.session_state.last_refresh = time.time()
 
@@ -59,97 +66,92 @@ if time.time() - st.session_state.last_refresh > REFRESH_INTERVAL:
     st.session_state.last_refresh = time.time()
     st.rerun()
 
-st.title("NW River Dipstick")
-st.write("Powered by gut instinct & AI.")
+# Sidebar navigation
+page = st.sidebar.selectbox("Page", ["Dashboard", "About"])
 
-df = get_latest_readings()
-if not df.empty:
-    # Updated: Styling function now uses loaded RULES
-    def apply_styles(row):
-        styles = [''] * len(row)
-        level_idx = row.index.get_loc('level')
-        station_id = row['station_id']
-        level = row['level']
-        
-        if station_id in RULES:
-            for rule in RULES[station_id]:
-                min_val = rule['min']
-                max_val = rule['max'] if rule['max'] is not None else float('inf')
-                if min_val <= level < max_val:  # Use < for upper bound to avoid overlap
-                    color = rule['color']
-                    # Map color to CSS (adjust for readability)
-                    if color == 'red':
-                        styles[level_idx] = 'background-color: red; color: white;'
-                    elif color == 'yellow':
-                        styles[level_idx] = 'background-color: yellow; color: black;'
-                    elif color == 'lightgreen':
-                        styles[level_idx] = 'background-color: lightgreen; color: black;'
-                    # Add more color mappings if needed
-                    break  # Stop after first match
-        
-        return styles
-
-    # Custom orders: station IDs from source to sea
-    RIBBLE_ORDER = ['710151', '710102', '710103', '710301', '710305', '713056', '713040']
-    EDEN_ORDER = ['760101', '760112', '760115', '760502', '762505', '765512', '762540']
-
-    # Split into two DataFrames
-    df_ribble = df[df['river'] == 'Ribble'].copy()
-    df_eden = df[df['river'] == 'Eden'].copy()
-
-    # Sort Ribble by custom order
-    if not df_ribble.empty:
-        df_ribble['sort_order'] = pd.Categorical(df_ribble['station_id'], categories=RIBBLE_ORDER, ordered=True)
-        df_ribble = df_ribble.sort_values('sort_order').drop('sort_order', axis=1)
-        # Rename columns as requested
-        df_ribble = df_ribble.rename(columns={'river': 'River', 'label': 'Station', 'timestamp': 'Latest Reading'})
-        # Reorder columns (keep station_id for styling, but hide later)
-        df_ribble = df_ribble[['River', 'Station', 'level', 'Latest Reading', 'station_id']]
-        st.subheader("River Ribble - Current Readings")
-        styled_ribble = df_ribble.style.apply(apply_styles, axis=1).format({"level": "{:.2f}m", "Latest Reading": "{:%d-%m-%Y @ %H:%M}"})
-        styled_ribble = styled_ribble.hide(subset=['station_id'], axis="columns")
-        st.dataframe(styled_ribble, hide_index=True)
-
-        # Add historical chart for each Ribble station
-        st.subheader("River Ribble - Historical Levels (Last 7 Days)")
-        for index, row in df_ribble.iterrows():
-            st.write(f"### {row['Station']}")
-            hist_df = get_historical_data(row['station_id'])
-            if not hist_df.empty:
-                st.line_chart(hist_df['level'])
-            else:
-                st.write("No historical data available.")
-
-    # Sort Eden by custom order
-    if not df_eden.empty:
-        df_eden['sort_order'] = pd.Categorical(df_eden['station_id'], categories=EDEN_ORDER, ordered=True)
-        df_eden = df_eden.sort_values('sort_order').drop('sort_order', axis=1)
-        # Rename columns as requested
-        df_eden = df_eden.rename(columns={'river': 'River', 'label': 'Station', 'timestamp': 'Latest Reading'})
-        # Reorder columns (keep station_id for styling, but hide later)
-        df_eden = df_eden[['River', 'Station', 'level', 'Latest Reading', 'station_id']]
-        st.subheader("River Eden - Current Readings")
-        styled_eden = df_eden.style.apply(apply_styles, axis=1).format({"level": "{:.2f}m", "Latest Reading": "{:%d-%m-%Y @ %H:%M}"})
-        styled_eden = styled_eden.hide(subset=['station_id'], axis="columns")
-        st.dataframe(styled_eden, hide_index=True)
-
-        # Add historical chart for each Eden station
-        st.subheader("River Eden - Historical Levels (Last 7 Days)")
-        for index, row in df_eden.iterrows():
-            st.write(f"### {row['Station']}")
-            hist_df = get_historical_data(row['station_id'])
-            if not hist_df.empty:
-                st.line_chart(hist_df['level'])
-            else:
-                st.write("No historical data available.")
-
+if page == "About":
+    st.title("About NW River Dipstick")
+    st.write("This app provides river level data & forecasts for a couple of Rivers in the North West UK.")
+    st.write("River Levels are displayed in metres")
+    st.write("Its very experiemntal. Data is pulled from various sources, AI predicts the river level in 24 hours.")
+    st.write("The colour coding is the height of the river in that moment, with fly fishing in mind")
+    st.write("Its important to note, the colour coding is based on real world experience, from real fisherman (not AI)")
+    st.write("Future plans: Rainfall integration, more rivers, improved Machine Learning.")
 else:
-    st.write("No data available yet. Run the collection script first.")
-# key
-st.write("red = bad level, stay at home")
-st.write("yellow = might be worth a cast")
-st.write("green = perfect level for fly fishing")
-# footer
-st.write("Data refreshed:  " + pd.Timestamp.now().strftime('%d-%m-%Y @ %H:%M'))
-st.write("Data source: [Environment Agency API](https://environment.data.gov.uk/flood-monitoring/doc/reference) ")
-st.write("Built using [streamlit.io](https://streamlit.io) & vibe coded by tim.")
+    st.title("NW River Dipstick")
+    st.write("Powered by gut instinct & AI.")
+
+    df = get_latest_readings()
+    if not df.empty:
+        def apply_styles(row):
+            styles = [''] * len(row)
+            level_idx = row.index.get_loc('level')
+            station_id = row['station_id']
+            level = row['level']
+            
+            if station_id in RULES:
+                for rule in RULES[station_id]:
+                    min_val = rule['min']
+                    max_val = rule['max'] if rule['max'] is not None else float('inf')
+                    if min_val <= level < max_val:
+                        color = rule['color']
+                        if color == 'red':
+                            styles[level_idx] = 'background-color: red; color: white;'
+                        elif color == 'yellow':
+                            styles[level_idx] = 'background-color: yellow; color: black;'
+                        elif color == 'lightgreen':
+                            styles[level_idx] = 'background-color: lightgreen; color: black;'
+                        break
+            return styles
+
+        from river_reference import STATIONS
+
+        tabs = st.tabs(list(STATIONS.keys()))
+        for i, river in enumerate(STATIONS.keys()):
+            with tabs[i]:
+                river_stations = STATIONS[river]
+                river_df = df[df['river'] == river].copy()
+                if not river_df.empty:
+                    river_df = river_df.set_index('station_id').reindex([s['id'] for s in river_stations]).reset_index()
+                    river_df = river_df.rename(columns={'river': 'River', 'label': 'Station', 'timestamp': 'Latest Reading'})
+                    river_df = river_df[['River', 'Station', 'level', 'Latest Reading', 'station_id']]
+                    styled_river = river_df.style.apply(apply_styles, axis=1).format({"level": "{:.2f}m", "Latest Reading": "{:%d-%m-%Y @ %H:%M}"})
+                    styled_river = styled_river.hide(subset=['station_id'], axis="columns")
+                    st.dataframe(styled_river, hide_index=True)
+
+                    st.subheader(f"Historical Levels (Last 7 Days) - {river}")
+                    for station in river_stations:
+                        st.write(f"### {station['label']}")
+                        hist_df = get_historical_data(station['id'])
+                        if not hist_df.empty:
+                            chart_data = hist_df.reset_index().rename(columns={'timestamp': 'Time', 'level': 'Level'})
+                            chart_data['Type'] = 'Historical'
+                            pred_df = get_predictions(station['id'])
+                            if not pred_df.empty:
+                                pred_df = pred_df.reset_index().rename(columns={'predicted_for': 'Time', 'predicted_level': 'Level'})
+                                pred_df['Type'] = 'Predicted'
+                                combined = pd.concat([chart_data, pred_df])
+                            else:
+                                combined = chart_data
+                            alt_chart = alt.Chart(combined).mark_line().encode(
+                                x='Time:T',
+                                y='Level:Q',
+                                color='Type:N',
+                                strokeDash=alt.condition(alt.datum.Type == 'Predicted', alt.value([5, 5]), alt.value([0]))
+                            ).properties(
+                                width=700,
+                                height=300
+                            )
+                            st.altair_chart(alt_chart, use_container_width=True)
+                        else:
+                            st.write("No historical data available.")
+    else:
+        st.write("No data available yet. Run the collection script first.")
+    st.write("Key:")
+    st.write("red = bad level, stay at home")
+    st.write("yellow = might be worth a cast")
+    st.write("green = perfect level for fly fishing")
+
+    st.write("Data refreshed:  " + pd.Timestamp.now().strftime('%d-%m-%Y @ %H:%M'))
+    st.write("Data source: [Environment Agency API](https://environment.data.gov.uk/flood-monitoring/doc/reference) ")
+    st.write("Built using [streamlit.io](https://streamlit.io) & vibe coded by tim.")
