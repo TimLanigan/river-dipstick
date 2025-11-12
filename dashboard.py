@@ -70,13 +70,14 @@ if time.time() - st.session_state.last_refresh > REFRESH_INTERVAL:
 page = st.sidebar.selectbox("Page", ["Dashboard", "About"])
 
 if page == "About":
-    st.title("About NW River Dipstick")
-    st.write("This app provides river level data & forecasts for a couple of Rivers in the North West UK.")
-    st.write("River Levels are displayed in metres")
-    st.write("Its very experiemntal. Data is pulled from various sources, AI predicts the river level in 24 hours.")
-    st.write("The colour coding is the height of the river in that moment, with fly fishing in mind")
-    st.write("Its important to note, the colour coding is based on real world experience, from real fisherman (not AI)")
-    st.write("Future plans: Rainfall integration, more rivers, improved Machine Learning.")
+    st.title("About the North West River Dipstick")
+    st.write("This app provides river level data & forecasts for a couple of rivers in the North West UK.")
+    st.write("Data is pulled from various sources, AI predicts the river level in 24 hours.")
+    st.write("River Levels are displayed in metres. The colour coding is the height of the river in that moment, with fly fishing in mind")
+    st.write("red = bad level, stay at home")
+    st.write("yellow = might be worth a cast")
+    st.write("green = perfect level for fly fishing")
+    st.write("Future plans: Rainfall integration, more rivers, improved Machine Learning. And going fishing instead of coding.")
 else:
     st.title("NW River Dipstick")
     st.write("Powered by gut instinct & AI.")
@@ -147,11 +148,6 @@ else:
                             st.write("No historical data available.")
     else:
         st.write("No data available yet. Run the collection script first.")
-    st.write("Key:")
-    st.write("red = bad level, stay at home")
-    st.write("yellow = might be worth a cast")
-    st.write("green = perfect level for fly fishing")
-
     st.write("Data refreshed:  " + pd.Timestamp.now().strftime('%d-%m-%Y @ %H:%M'))
     st.write("Data source: [Environment Agency API](https://environment.data.gov.uk/flood-monitoring/doc/reference) ")
     st.write("Built using [streamlit.io](https://streamlit.io) & vibe coded by tim.")

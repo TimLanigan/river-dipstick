@@ -3,7 +3,6 @@ STATIONS = {
     'Ribble': [
         {'id': '710151', 'label': 'Locks Weir'},
         {'id': '710102', 'label': 'Penny Bridge'},
-        {'id': '710103', 'label': 'Arnford Weir'},
         {'id': '710301', 'label': 'Low Moor'},
         {'id': '710305', 'label': 'Henthorn'},
         {'id': '713056', 'label': 'New Jumbles Rock'},

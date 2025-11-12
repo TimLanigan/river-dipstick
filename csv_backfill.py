@@ -32,7 +32,7 @@ def get_earliest_date(cursor, station_id):
 from river_reference import STATIONS  # Updated to use STATIONS for grouped structure
 
 # Backfill settings (days to backfill before earliest date per station)
-days_back = 30
+days_back = 1
 conn = sqlite3.connect(DB_FILE)
 cursor = conn.cursor()
 
