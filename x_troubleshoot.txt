@@ -32,6 +32,10 @@ nohup streamlit run dashboard.py --server.port 8501 --server.address 0.0.0.0 --s
 
 sqlite3 river_levels.db "SELECT station_id, COUNT(*), MIN(timestamp), MAX(timestamp) FROM readings GROUP BY station_id;"
 
+sqlite3 river_levels.db "SELECT station_id, COUNT(*), MIN(timestamp), MAX(timestamp) FROM readings GROUP BY station_id;"
+
+
+
 curl "https://environment.data.gov.uk/flood-monitoring/id/stations?riverName=River%20Lune"grep CRON /var/log/syslog
 
 
