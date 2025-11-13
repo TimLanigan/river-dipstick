@@ -4,7 +4,7 @@ import pandas as pd
 import time
 import json
 import altair as alt  # For advanced charts
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC  # Added UTC
 
 DB_FILE = '/home/river_levels_app/river_levels.db'
 RULES_FILE = '/home/river_levels_app/rules.json'
@@ -34,7 +34,7 @@ def get_latest_readings():
 
 def get_historical_data(station_id, days=7):
     conn = sqlite3.connect(DB_FILE)
-    start_date = (datetime.now() - timedelta(days=days)).isoformat()
+    start_date = (datetime.now(UTC) - timedelta(days=days)).isoformat()
     query = """
         SELECT timestamp, level
         FROM readings
@@ -44,17 +44,20 @@ def get_historical_data(station_id, days=7):
     df = pd.read_sql_query(query, conn, params=(station_id, start_date))
     conn.close()
     df['timestamp'] = pd.to_datetime(df['timestamp'])
-    df = df.set_index('timestamp')
+    df = df.rename(columns={'level': 'Level (metres)'})
+    df['Type'] = 'Historical'
     return df
 
-def get_predictions(station_id):
+def get_predictions(station_id, days=7):
     conn = sqlite3.connect(DB_FILE)
-    query = "SELECT predicted_for, predicted_level FROM predictions WHERE station_id = ? ORDER BY predicted_for"
-    df = pd.read_sql_query(query, conn, params=(station_id,))
+    start_date = (datetime.now(UTC) - timedelta(days=days)).isoformat()
+    query = "SELECT predicted_for, predicted_level FROM predictions WHERE station_id = ? AND predicted_for >= ? ORDER BY predicted_for"
+    df = pd.read_sql_query(query, conn, params=(station_id, start_date))
     conn.close()
     if not df.empty:
         df['predicted_for'] = pd.to_datetime(df['predicted_for'])
-        df = df.set_index('predicted_for')
+        df = df.rename(columns={'predicted_for': 'Date', 'predicted_level': 'Level (metres)'})
+        df['Type'] = 'Predicted'
     return df
 
 # Optional auto-refresh
@@ -70,17 +73,26 @@ if time.time() - st.session_state.last_refresh > REFRESH_INTERVAL:
 page = st.sidebar.selectbox("Page", ["Dashboard", "About"])
 
 if page == "About":
-    st.title("About the North West River Dipstick")
-    st.write("This app provides river level data & forecasts for a couple of rivers in the North West UK.")
-    st.write("Data is pulled from various sources, AI predicts the river level in 24 hours.")
-    st.write("River Levels are displayed in metres. The colour coding is the height of the river in that moment, with fly fishing in mind")
-    st.write("red = bad level, stay at home")
-    st.write("yellow = might be worth a cast")
-    st.write("green = perfect level for fly fishing")
-    st.write("Future plans: Rainfall integration, more rivers, improved Machine Learning. And going fishing instead of coding.")
+    st.title("About River Dipstick")
+    st.write("This app is designed to answer the eternal question...")
+    st.markdown("*Will the river be good for fishing tomorrow?*")
+    st.write("The colour coding in the tables is the height of the river in that moment, with fly fishing in mind")
+    st.markdown(''':red[bad levels, stay at home]''')
+    st.markdown(''':yellow[it might be worth a cast]''')
+    st.markdown(''':green[pull a sicky and go fishing now!!]''')
+    st.write("Please note, this colour coding is based on real world experience, from real fisherman (not AI)")
+    st.write("Machine Learning (ML) is used to predict the river level in 24 hours.")
+    st.write("To see the ML predictions, open the top right menu and toggle 'show predictions'")
+    st.markdown(''':blue[The blue line is real data from the Environment Ageny]''')
+    st.markdown(''':grey[The grey area shows how the model performed over the previous 7 days]''')
+    st.markdown(''':violet[Violet is the 24 hr prediction]''')
+    st.write("Future plans: full rainfall integration, improved ML, more rivers and more fishing.")
 else:
-    st.title("NW River Dipstick")
-    st.write("Powered by gut instinct & AI.")
+    st.title("River Dipstick")
+    st.write("Powered by gut instinct & machine learning")
+
+    # Toggle for predictions
+    show_predictions = st.sidebar.toggle("Show Predictions", value=False)
 
     df = get_latest_readings()
     if not df.empty:
@@ -125,20 +137,37 @@ else:
                         st.write(f"### {station['label']}")
                         hist_df = get_historical_data(station['id'])
                         if not hist_df.empty:
-                            chart_data = hist_df.reset_index().rename(columns={'timestamp': 'Time', 'level': 'Level'})
-                            chart_data['Type'] = 'Historical'
-                            pred_df = get_predictions(station['id'])
-                            if not pred_df.empty:
-                                pred_df = pred_df.reset_index().rename(columns={'predicted_for': 'Time', 'predicted_level': 'Level'})
-                                pred_df['Type'] = 'Predicted'
-                                combined = pd.concat([chart_data, pred_df])
-                            else:
-                                combined = chart_data
-                            alt_chart = alt.Chart(combined).mark_line().encode(
-                                x='Time:T',
-                                y='Level:Q',
-                                color='Type:N',
-                                strokeDash=alt.condition(alt.datum.Type == 'Predicted', alt.value([5, 5]), alt.value([0]))
+                            hist_df = hist_df.reset_index().rename(columns={'timestamp': 'Date'})
+                            hist_df['Type'] = 'Real'
+                            chart_data = hist_df
+                            legend = None  # No legend by default
+                            if show_predictions:
+                                pred_df = get_predictions(station['id'])
+                                if not pred_df.empty:
+                                    pred_df = pred_df.reset_index().rename(columns={'predicted_for': 'Date'})
+                                    # Split past and future
+                                    now = datetime.now(tz=UTC)  # Make aware
+                                    past_pred = pred_df[pred_df['Date'] < now].copy()
+                                    future_pred = pred_df[pred_df['Date'] >= now].copy()
+                                    past_pred['Type'] = 'Past'
+                                    future_pred['Type'] = 'Future'
+                                    chart_data = pd.concat([chart_data, past_pred, future_pred])
+                                legend = alt.Legend()  # Show legend when predictions on
+                            alt_chart = alt.Chart(chart_data).mark_line().encode(
+                                x=alt.X('Date:T', title='Date'),
+                                y=alt.Y('Level (metres):Q', title='Level (metres)'),
+                                color=alt.Color('Type:N', scale=alt.Scale(domain=['Real', 'Past', 'Future'], range=['blue', 'grey', 'violet']), legend=legend),
+                                strokeDash=alt.condition(
+                                    alt.datum.Type == 'Real',
+                                    alt.value([0]),  # Solid for historical
+                                    alt.value([5, 5])  # Dashed for predictions
+                                ),
+                                opacity=alt.condition(
+                                    alt.datum.Type == 'Real',
+                                    alt.value(1.0),  # Full opacity for historical
+                                    alt.value(0.4)   # More translucent for predictions
+                                ),
+                                tooltip=['Date', 'Level (metres)', 'Type']
                             ).properties(
                                 width=700,
                                 height=300
