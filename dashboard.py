@@ -132,7 +132,6 @@ else:
                     styled_river = styled_river.hide(subset=['station_id'], axis="columns")
                     st.dataframe(styled_river, hide_index=True)
 
-                    st.subheader(f"Historical Levels (Last 7 Days) - {river}")
                     for station in river_stations:
                         st.write(f"### {station['label']}")
                         hist_df = get_historical_data(station['id'])
