@@ -5,6 +5,7 @@ import time
 import json
 import altair as alt  # For advanced charts
 from datetime import datetime, timedelta, UTC  # Added UTC
+st.set_page_config(page_title="dipstick", page_icon="/home/river_levels_app/favicon.png")  # Replace with your favicon path or URL
 
 DB_FILE = '/home/river_levels_app/river_levels.db'
 RULES_FILE = '/home/river_levels_app/rules.json'
@@ -75,16 +76,16 @@ page = st.sidebar.selectbox("Page", ["Dashboard", "About"])
 if page == "About":
     st.title("About River Dipstick")
     st.write("This app is designed to answer the eternal question...")
-    st.markdown("*Will the river be good for fishing tomorrow?*")
-    st.write("The colour coding in the tables is the height of the river in that moment, with fly fishing in mind")
-    st.markdown(''':red[bad levels, stay at home]''')
-    st.markdown(''':yellow[it might be worth a cast]''')
-    st.markdown(''':green[pull a sicky and go fishing now!!]''')
-    st.write("Please note, this colour coding is based on real world experience, from real fisherman (not AI)")
+    st.markdown("*Will the river be good for fly fishing tomorrow?*")
+    st.write("The colours in each table indicate if the level is good for Fly Fishing")
+    st.markdown(''':red[Bad levels, stay at home]''')
+    st.markdown(''':yellow[It might be worth a cast]''')
+    st.markdown(''':green[Pull a sicky and go fishing!!]''')
+    st.write("Colour coding is based on real world experience, crowdsourced from local fisherman.")
     st.write("Machine Learning (ML) is used to predict the river level in 24 hours.")
     st.write("To see the ML predictions, open the top right menu and toggle 'show predictions'")
     st.markdown(''':blue[The blue line is real data from the Environment Ageny]''')
-    st.markdown(''':grey[The grey area shows how the model performed over the previous 7 days]''')
+    st.markdown(''':grey[The grey area shows how the prediction model performed over the previous 7 days]''')
     st.markdown(''':violet[Violet is the 24 hr prediction]''')
     st.write("Future plans: full rainfall integration, improved ML, more rivers and more fishing.")
 else:
