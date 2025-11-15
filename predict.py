@@ -44,7 +44,7 @@ def get_historical_for_prediction(station_id, rainfall_id):
         WHERE level_station_id = %s AND timestamp >= %s 
         ORDER BY timestamp
     """
-    rain_start = (datetime.now(UTC) - timedelta(days=7)).isoformat()
+    rain_start = (datetime.now(UTC) - timedelta(days=10)).isoformat()
     rain_df = pd.read_sql_query(rain_query, engine, params=(station_id, rain_start))
     
     # === RESAMPLE TO HOURLY + STRIP TIMEZONE ===
