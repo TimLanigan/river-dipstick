@@ -63,67 +63,57 @@ def _save_cache(cache: Dict[str, Tuple[float, float]]):
 # --------------------------------------------------------------------------- #
 # CORE LOADER
 # --------------------------------------------------------------------------- #
-def load_stations():
-    import csv
-    import json
-    import os
-    from loguru import logger
+def load_stations() -> Dict[str, List[Dict]]:
+    """
+    Returns:
+        {
+            "Eden": [{"id": "760101", "label": "Kirkby Stephen", "lat": 54.47, "lon": -2.35}, ...],
+            ...
+        }
+    """
+    # ------------------------------------------------------------------- #
+    # 1. Create CSV if it doesn't exist
+    # ------------------------------------------------------------------- #
+    if not CSV_PATH.exists():
+        logger.info("stations.csv not found – creating default at {}", CSV_PATH)
+        CSV_PATH.write_text(DEFAULT_CSV_CONTENT.strip() + "\n", encoding="utf-8")
 
-    CSV_PATH = "/home/river_levels_app/data/stations.csv"
-    CACHE_PATH = "/home/river_levels_app/data/station_coords_cache.json"
+    cache = _load_cache()
+    stations: Dict[str, List[Dict]] = {}
 
-    STATIONS = {}
-
-    # Load cache
-    cache = {}
-    if os.path.exists(CACHE_PATH):
-        with open(CACHE_PATH, 'r') as f:
-            cache = json.load(f)
-
-    with open(CSV_PATH, newline='') as csvfile:
-        reader = csv.DictReader(csvfile)
+    with CSV_PATH.open(newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
         for row in reader:
             river = row["river"].strip()
-            sid = row["station_id"].strip()
+            sid   = row["station_id"].strip()
             label = row["label"].strip()
-            lat = row["lat"].strip()
-            lon = row["lon"].strip()
-            rainfall_id = row.get("rainfall_id", "").strip() or None  # ← CRITICAL LINE
+            lat   = row["lat"].strip() or None
+            lon   = row["lon"].strip() or None
 
-            # Use CSV lat/lon if available
-            if lat and lon:
-                lat, lon = float(lat), float(lon)
-                cache[sid] = (lat, lon)
-                logger.debug(f"CSV hit for {sid} → {lat},{lon}")
-            else:
-                # Fallback to cache or API
+            # --------------------------------------------------------------- #
+            # Fill missing coordinates from EA API (cached)
+            # --------------------------------------------------------------- #
+            if not (lat and lon):
                 if sid in cache:
                     lat, lon = cache[sid]
-                    logger.debug(f"Cache hit for {sid} → {lat},{lon}")
+                    logger.debug("Cache hit for {} → {},{}", sid, lat, lon)
                 else:
-                    lat, lon = fetch_coordinates_from_ea(sid)
+                    lat, lon = _fetch_coords_from_ea(sid)
                     if lat and lon:
                         cache[sid] = (lat, lon)
-                        logger.debug(f"API hit for {sid} → {lat},{lon}")
+                        _save_cache(cache)
                     else:
-                        lat, lon = None, None
-                        logger.warning(f"No coordinates for {sid}")
+                        logger.warning("No coords for station {}", sid)
 
-            if river not in STATIONS:
-                STATIONS[river] = []
-            STATIONS[river].append({
+            entry = {
                 "id": sid,
                 "label": label,
-                "lat": lat,
-                "lon": lon,
-                "rainfall_id": rainfall_id  # ← NOW INCLUDED
-            })
+                "lat": float(lat) if lat else None,
+                "lon": float(lon) if lon else None,
+            }
+            stations.setdefault(river, []).append(entry)
 
-    # Save updated cache
-    with open(CACHE_PATH, 'w') as f:
-        json.dump(cache, f, indent=2)
-
-    return STATIONS
+    return stations
 
 
 def _fetch_coords_from_ea(station_id: str) -> Tuple[float | None, float | None]:
@@ -153,5 +143,3 @@ if __name__ == "__main__":
     import pprint
     pprint.pprint(load_stations())
     sys.exit(0)
-# === AUTO-LOAD STATIONS FOR IMPORT ===
-STATIONS = load_stations()

@@ -52,3 +52,13 @@ sqlite3 /home/river_levels_app/river_levels.db "DELETE FROM readings WHERE stati
 
 
 /usr/bin/flock -w 0 /home/river_levels_app/logs/cron.lock
+
+
+
+CREATE USER river_user WITH PASSWORD '***REMOVED***';  -- Replace with secure pass
+CREATE DATABASE river_levels_db;
+GRANT ALL PRIVILEGES ON DATABASE river_levels_db TO river_user;
+\q
+
+
+pgloader sqlite:///home/river_levels_app/river_levels.db postgresql://river_user:***REMOVED***@localhost/river_levels_db

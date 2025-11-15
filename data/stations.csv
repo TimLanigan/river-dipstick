@@ -1,0 +1,19 @@
+river,station_id,label,lat,lon,rainfall_id
+Eden,760101,Kirkby Stephen,54.4731,-2.3486,598691
+Eden,760112,Great Musgrave Bridge,54.4603,-2.3662,598691
+Eden,760115,Appleby,54.5798,-2.4914,598691
+Eden,760502,Temple Sowerby,54.6483,-2.6144,604742
+Eden,762505,Great Corby,54.8901,-2.8307,604142
+Eden,765512,Sheepmount,54.9049,-2.9529,596791
+Eden,762540,Linstock,54.9128,-2.8930,604142
+Ribble,710151,Locks Weir,54.0844,-2.2805,582970
+Ribble,710102,Penny Bridge,54.0653,-2.2857,573674
+Ribble,710301,Low Moor,53.8728,-2.4144,575335
+Ribble,710305,Henthorn,53.8480,-2.4243,575335
+Ribble,713056,New Jumbles Rock,53.8337,-2.4535,575335
+Ribble,713040,Ribchester School,53.8112,-2.5310,576578
+River Lune,724735,Lancaster Quay,54.051851,-2.822021,577794
+River Lune,724629,Caton,54.081344,-2.722026,582970
+River Lune,722242,Lunes Bridge,54.420034,-2.599286,581159
+River Lune,722421,Killington,54.310113,-2.582471,581159
+River Lune,724647,Skerton Weir,54.063594,-2.791879,577794
