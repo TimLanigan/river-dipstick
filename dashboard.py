@@ -77,7 +77,7 @@ if page == "About":
     st.title("About River Dipstick")
     st.write("This app is designed to answer the eternal question...")
     st.markdown("*Will the river be good for fly fishing tomorrow?*")
-    st.write("The colours in each table indicate if the level is good for Fly Fishing")
+    st.write("The colours in each table indicate if the condtions are good for fly fishing for trout")
     st.markdown(''':red[Bad levels, stay at home]''')
     st.markdown(''':yellow[It might be worth a cast]''')
     st.markdown(''':green[Pull a sicky and go fishing!!]''')
