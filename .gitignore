@@ -1,24 +1,58 @@
-# Virtual environment (ignore all Python deps)
+# =========================
+# River Dipstick .gitignore
+# =========================
+
+# Virtual environments
 env/
+venv/
+.venv/
+ENV/
 
-# Database files
-river_levels.db
-*.db
-
-# Logs and temp files
-log.txt
-*.log
-*.txt  # If you have other text logs; adjust if you want to track specific ones
-nohup.out
-.streamlit/
-
-# Python cache and bytecode
+# Python cache & bytecode
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
 *.pyo
 *.pyd
 
-# Other backups/temp
-*.bak
+# Streamlit
+.streamlit/
+.streamlit/secrets.toml
+
+# Logs & temp files
+*.log
+*.txt
+log.txt
+nohup.out
+
+# SQLite / local test DBs (we use PostgreSQL in prod)
+river_levels.db
+*.db
+*.sqlite3
+
+# Docker volumes (local dev)
+pgdata/
+
+# Editor / OS junk
+.DS_Store
+Thumbs.db
 *.swp
+*.swo
+*~
+*.bak
 *.tmp
+
+# Local config that contains secrets
+.env
+.env.local
+.env.*.local
+
+# Data folder caches we regenerate
+data/station_coords_cache.json
+
+# Anything you throw in a trash folder while testing
+trash/
+
+# VS Code settings (optional – keep if you want to share workspace config)
+# .vscode/
+# !.vscode/settings.json   # <-- uncomment if you want to share some settings
