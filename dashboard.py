@@ -12,8 +12,9 @@ import json
 import altair as alt
 from datetime import datetime, timedelta, UTC
 
-# === IMPORT STATIONS ===
-from river_reference import STATIONS
+# === IMPORT STATIONS (RELOAD ON EVERY RUN) ===
+from river_reference import load_stations
+STATIONS = load_stations()  # ← RELOAD FROM CSV
 
 st.set_page_config(
     page_title="River Dipstick",
@@ -106,26 +107,36 @@ if time.time() - st.session_state.last_refresh > REFRESH_INTERVAL:
 
 # === PAGE: ABOUT ===
 if page == "About":
-    col1, col2 = st.columns([1, 8])
+    col1, col2 = st.columns([8, 1])
     with col1:
-        st.image("/home/river_levels_app/favicon.png", width=60)
-    with col2:
         st.title("About River Dipstick")
+    with col2:
+        st.image("/home/river_levels_app/favicon.png", width=60)
+
     st.write("This app is designed to answer the eternal question...")
     st.markdown("*Will the river be good for fly fishing tomorrow?*")
-    st.write("The colours in each table indicate if the conditions are good for fly fishing for trout")
+    st.write("The features described below are experimental but will improve over time as more data is collected.")
+    st.write("My primary focus is rivers in the NW UK, the rivers I fish or hope to fish. This keeps cost and complexity low.")
+    st.subheader("Colour Coding")
+    st.write("The colours in each river table indicate if the conditions are good for fly fishing near that measurement station at the current time.")
     st.markdown(':red[Bad levels, stay at home]')
     st.markdown(':yellow[It might be worth a cast]')
     st.markdown(':green[Pull a sicky and go fishing!!]')
-    st.write("Colour coding is based on real world experience, crowdsourced from local fisherman.")
+    st.write("Colour coding is only added to beats I know about, crowd-sourcing will come next.")
+    st.subheader("Predicted Levels")
     st.write("Machine Learning (ML) is used to predict the river level in 24 hours.")
+    st.write("The current model uses at least 1 years worth of Level and Rainfall data to make a prediction for each measurement station")
     st.write("To see the ML predictions, toggle 'Predictions' on the Dashboard.")
     st.markdown(':blue[The blue line is real data from the Environment Agency]')
-    st.markdown(':grey[The grey area shows how the prediction model performed over the previous 7 days]')
-    st.markdown(':violet[Violet is the 24 hr prediction]')
-    st.write("Future plans: full rainfall integration, improved ML, more rivers and more fishing.")
-    st.write("Data source: [Environment Agency API](https://environment.data.gov.uk/flood-monitoring/doc/reference)")
-    st.write("Built using [streamlit.io](https://streamlit.io) & vibe coded by tim.")
+    st.markdown(':grey[The grey line shows how the prediction model performed over the previous 7 days]')
+    st.markdown(':violet[Violet is the 24 hr river level prediction]')
+    st.subheader("Rainfall")
+    st.write("Toggle 'Rain' to view how much rain has fallen near the measurement station over the last 7 days.")
+    st.subheader("etc")
+    st.write("Future plans: improved ML, more rivers and more fishing.")
+    st.write("All data source from: [Environment Agency API](https://environment.data.gov.uk/flood-monitoring/doc/reference)")
+    st.write("Built using [streamlit.io](https://streamlit.io) & vibe coded by tim & grok.")
+    st.write("Finally, when I go fishing I take pictures and talk about it here: [downstream blog](https://downstreamblog.uk).")
 
 # === PAGE: DASHBOARD ===
 else:
@@ -161,10 +172,9 @@ else:
     with col_t1:
         show_predictions = st.toggle("Predictions", value=False, key="show_predictions")
     with col_t2:
-        show_map = st.toggle("Map", value=False, key="show_map")
-    with col_t3:
         show_rain = st.toggle("Rain", value=False, key="show_rain", help="Show rainfall from nearest EA gauge")
-
+    with col_t3:
+        show_map = st.toggle("Map", value=False, key="show_map")
     # === DATA ===
     df = get_latest_readings()
 
@@ -190,22 +200,70 @@ else:
             return styles
 
         # === RIVER TABS ===
-        tabs = st.tabs(list(STATIONS.keys()))
+        # Custom tab labels
+        tab_labels = {
+            "Eden": "Eden",
+            "Ribble": "Ribble",
+            "Lune": "Lune"
+        }
+        tabs = st.tabs([tab_labels.get(r, r) for r in STATIONS.keys()])
 
         for i, river in enumerate(STATIONS.keys()):
             with tabs[i]:
                 river_stations = STATIONS[river]
-                river_df = df[df['river'] == river].copy()
+                
+                # === SORT STATIONS SOURCE TO SEA (CUSTOM PER RIVER) ===
+                if river == 'Eden':
+                    # Eden: source south, sea north - sort lat ascending
+                    river_stations = sorted(river_stations, key=lambda s: s.get('lat', 0))
+                else:
+                    # Ribble/Lune: source north, sea south - sort lat descending
+                    river_stations = sorted(river_stations, key=lambda s: s.get('lat', 0), reverse=True)
+
+                # Map STATIONS key → DB river name
+                db_river_name = river
+                river_df = df[df['river'] == db_river_name].copy()
                 if not river_df.empty:
-                    river_df = river_df.set_index('station_id').reindex([s['id'] for s in river_stations]).reset_index()
-                    river_df = river_df.rename(columns={'river': 'River', 'label': 'Station', 'timestamp': 'Latest Reading'})
-                    river_df = river_df[['River', 'Station', 'level', 'Latest Reading', 'station_id']]
-                    styled_river = river_df.style.apply(apply_styles, axis=1).format({"level": "{:.2f}m", "Latest Reading": "{:%d-%m-%Y @ %H:%M}"})
+                    # === GET LATEST READING PER STATION ===
+                    river_df['timestamp'] = pd.to_datetime(river_df['timestamp'])
+                    latest_df = river_df.loc[river_df.groupby('station_id')['timestamp'].idxmax()]
+                    
+                    # Reindex in source-to-sea order
+                    latest_df = latest_df.set_index('station_id').reindex([s['id'] for s in river_stations]).reset_index()             
+                    latest_df = latest_df.rename(columns={'river': 'River', 'label': 'Station', 'timestamp': 'Latest Reading'})
+                    latest_df = latest_df[['River', 'Station', 'level', 'Latest Reading', 'station_id']]
+
+                    # === FORMAT TIMESTAMP BEFORE BADGE ===
+                    def format_time(x):
+                        if pd.isna(x):
+                            return "No data"
+                        return x.strftime('%d-%m-%Y @ %H:%M')
+
+                    # === ADD "NO RECENT DATA" BADGE IF >2H OLD ===
+                    now = datetime.now(UTC)
+                    for idx, row in latest_df.iterrows():
+                        if pd.notna(row['Latest Reading']):
+                            ts = pd.to_datetime(row['Latest Reading'])
+                            hours_ago = (now - ts).total_seconds() / 3600
+                            if hours_ago > 2:
+                                latest_df.loc[idx, 'Latest Reading'] = f"{row['Latest Reading']} ⚠️"
+
+                    # Safe format
+                    def safe_time_format(x):
+                        return x.strftime('%d-%m-%Y @ %H:%M') if pd.notna(x) and '⚠️' not in str(x) else str(x)
+
+                    styled_river = latest_df.style.apply(apply_styles, axis=1).format({
+                        "level": "{:.2f}m",
+                        "Latest Reading": safe_time_format
+                    })
                     styled_river = styled_river.hide(subset=['station_id'], axis="columns")
                     st.dataframe(styled_river, hide_index=True)
+                else:
+                    st.write(f"No current data for {river}")
 
+                    # ... your full chart logic ...
                 # === STATION CHARTS ===
-                for station in river_stations:
+                for station in river_stations:  # Use sorted river_stations for charts too
                     st.write(f"### {station['label']}")
                     hist_df = get_historical_data(station['id'])
                     if not hist_df.empty:
@@ -236,7 +294,7 @@ else:
                         # === MEGA GRAPH (FIXED LAYER) ===
                         base = alt.Chart(chart_data).encode(x=alt.X('Date:T', title='Date'))
 
-                                                # Level line (BOLD FOREGROUND)
+                        # Level line (BOLD FOREGROUND)
                         level_chart = base.mark_line(
                             strokeWidth=3  # ← Thicker line
                         ).encode(
@@ -269,7 +327,7 @@ else:
                         mega_chart = mega_chart.properties(
                             width=700,
                             height=300,
-                            title=f"{station['label']} — Level + Rain + Predictions"
+                            title=f"Mega chart:"
                         )
                         st.altair_chart(mega_chart, use_container_width=True)
 
@@ -284,8 +342,30 @@ else:
     else:
         st.write("No data available yet. Run the collection script first.")
 
-    # === FOOTER ===
-    st.markdown("---")
-    st.write(f"Data refreshed: {pd.Timestamp.now().strftime('%d-%m-%Y @ %H:%M')}")
-    st.write("Data source: [Environment Agency API](https://environment.data.gov.uk/flood-monitoring/doc/reference)")
-    st.write("Built using [streamlit.io](https://streamlit.io) & vibe coded by tim.")
+# === FOOTER ===
+
+# Buy Me a Coffee
+st.markdown(
+    """
+    <div style="text-align: left; margin: 20px 0;">
+    Use the menu in the top right hand corner to access the about page for more info about the site and how the features work.<br><br>
+    If I've helped you catch a fish, please consider buying me a coffee to help keep me and the servers running sweet!<br><br>
+        <a href="https://buymeacoffee.com/riverdipstick" target="_blank">
+            <img src="https://img.buymeacoffee.com/button-api/?text=Buy me a coffee&emoji=☕&slug=riverdipstick&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=FFFFFF" height="42">
+        </a>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+# About + Data Source
+#st.markdown(
+#    """
+#    <div style="text-align: left; font-size: 0.9rem; color: #888;">
+#        <a href="https://environment.data.gov.uk/flood-monitoring/doc/reference" target="_blank">Data source: Environment Agency API</a> •
+#        Built with <a href="https://streamlit.io" target="_blank">Streamlit</a> & 
+#        <a href="?page=about" style="color: #888;">vibe coded by tim and grok</a>
+#    </div>
+#    """,
+#    unsafe_allow_html=True
+#)

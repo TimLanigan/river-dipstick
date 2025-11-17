@@ -1,0 +1,75 @@
+================================================================
+RIVER DIPSTICK - DATABASE LOGIN & SQL QUERIES
+================================================================
+
+1. SSH INTO SERVER
+----------------------------------------------------------------
+ssh root@your-server-ip
+cd /home/river_levels_app
+
+2. ACTIVATE VIRTUAL ENV
+----------------------------------------------------------------
+source env/bin/activate
+
+3. LOG INTO POSTGRESQL
+----------------------------------------------------------------
+psql -U river_user -d river_levels_db -W
+Password: ***REMOVED***
+
+You're in! Type \q to exit.
+
+================================================================
+EXAMPLE SQL QUERIES
+================================================================
+
+-- 1. CHECK MIN/MAX LEVEL FOR RIVER LUNE
+SELECT 
+    station_id, 
+    label, 
+    MIN(timestamp) AS earliest_level,
+    MAX(timestamp) AS latest_level,
+    COUNT(*) AS total_readings
+FROM readings 
+WHERE river = 'River Lune'
+GROUP BY station_id, label
+ORDER BY station_id;
+
+-- 2. CHECK MIN/MAX RAINFALL FOR RIVER LUNE
+SELECT * from rainfall_readings
+    MIN(timestamp) AS earliest_rain,
+    MAX(timestamp) AS latest_rain,
+    COUNT(*) AS total_rain_readings
+GROUP BY level_station_id
+ORDER BY level_station_id;
+
+-- 3. CHECK ALL RIVERS (LEVELS)
+SELECT 
+    river, 
+    COUNT(DISTINCT station_id) AS stations,
+    MIN(timestamp) AS earliest,
+    MAX(timestamp) AS latest
+FROM readings 
+GROUP BY river
+ORDER BY river;
+
+-- 4. CHECK PREDICTIONS FOR A STATION
+SELECT 
+    predicted_for, 
+    predicted_level 
+FROM predictions 
+WHERE station_id = '724735' 
+ORDER BY predicted_for DESC 
+LIMIT 10;
+
+-- RAINFALL: MIN/MAX DATE PER STATION
+SELECT 
+    level_station_id,
+    rainfall_station_id,
+    MIN(timestamp) AS earliest_rain,
+    MAX(timestamp) AS latest_rain,
+    COUNT(*) AS total_readings
+FROM rainfall_readings
+GROUP BY level_station_id, rainfall_station_id
+ORDER BY level_station_id;
+
+\q
