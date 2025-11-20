@@ -11,6 +11,11 @@ import time
 import json
 import altair as alt
 from datetime import datetime, timedelta, UTC
+from dotenv import load_dotenv 
+import os
+load_dotenv()
+DB_PASS = os.getenv("DB_PASSWORD")
+CONNECTION_STRING = f'dbname=river_levels_db user=river_user password={DB_PASS} host=localhost'
 
 # === IMPORT STATIONS (RELOAD ON EVERY RUN) ===
 from river_reference import load_stations
@@ -21,7 +26,7 @@ st.set_page_config(
     page_icon="static/logo.png",  # Relative path
     layout="wide"
 )
-CONNECTION_STRING = 'dbname=river_levels_db user=river_user password=***REMOVED*** host=localhost'
+
 RULES_FILE = '/home/river_levels_app/rules.json'
 
 # Load rules from JSON

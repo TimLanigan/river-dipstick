@@ -14,8 +14,11 @@ from river_reference import STATIONS
 import time
 import warnings
 warnings.filterwarnings("ignore")
-
-CONNECTION_STRING = 'postgresql://river_user:***REMOVED***@localhost/river_levels_db'
+from dotenv import load_dotenv
+import os
+load_dotenv()
+DB_PASS = os.getenv("DB_PASSWORD")
+CONNECTION_STRING = f'postgresql://river_user:{DB_PASS}@localhost/river_levels_db'
 
 def get_engine():
     return create_engine(CONNECTION_STRING)

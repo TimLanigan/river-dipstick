@@ -10,8 +10,11 @@ from datetime import datetime, timedelta, UTC
 import time
 from loguru import logger
 from river_reference import STATIONS
-
-CONNECTION_STRING = "dbname=river_levels_db user=river_user password=***REMOVED*** host=localhost"
+from dotenv import load_dotenv
+import os
+load_dotenv()
+DB_PASS = os.getenv("DB_PASSWORD")
+CONNECTION_STRING = f'postgresql://river_user:{DB_PASS}@localhost/river_levels_db'
 
 # --------------------------------------------------------------------------- #
 # DATABASE
