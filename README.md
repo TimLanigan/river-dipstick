@@ -28,8 +28,8 @@ https://riverdipstick.uk (or whatever domain you point at the VPS)
 - Python 3.12 + Prophet + pandas + altair  
 - PostgreSQL  
 - Environment Agency flood-monitoring API  
-- Cron’d data collection & prediction scripts  
-- Docker-ready (coming to this repo in the next 5 minutes)
+- SuperCronhic'd data collection & prediction scripts  
+- Docker happening soon
 
 ### Local Development (macOS / mini-PC / anywhere)
 ```bash
