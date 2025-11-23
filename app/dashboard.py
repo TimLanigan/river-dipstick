@@ -115,7 +115,7 @@ st.markdown("""
 # === TOGGLES ===
 c1, c2, c3, c4 = st.columns(4)
 with c1: show_predictions = st.toggle("Level Predictions", False)
-with c2: show_sweet_spot   = st.toggle("Sweet Spot", False)
+with c2: show_sweet_spot   = st.toggle("G Spot", False)
 with c3: show_rain         = st.toggle("Rain History", False)
 with c4: show_map          = st.toggle("Map", False)
 
