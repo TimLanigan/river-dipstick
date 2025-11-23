@@ -144,33 +144,20 @@ if page == "About":
 
 # === PAGE: DASHBOARD ===
 else:
-    # === RESPONSIVE HEADER: TITLE LEFT, LOGO BASE64 (MOBILE + DESKTOP) ===
-    try:
-        with open("static/logo_base64.txt", "r") as f:
-            logo_base64 = f.read().strip()
-    except FileNotFoundError:
-        logo_base64 = ""  # Fallback
-
+    # === RESPONSIVE HEADER: TITLE + TAGLINE (CENTRED) ===
     st.markdown(
-        f"""
-        <div style="
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 0;
-            flex-wrap: nowrap;
-        ">
-            <div style="font-size: 2rem; font-weight: bold; white-space: nowrap;">
-                River Dipstick
-            </div>
-            <div style="margin-left: 20px; flex-shrink: 0;">
-                <img src="data:image/png;base64,{logo_base64}" width="80" style="height: auto;">
-            </div>
+    """
+    <div style="text-align: center; padding: 10px 0;">
+        <div style="font-size: 2.8rem; font-weight: bold; color: white;">
+            River Dipstick
         </div>
-        """,
-        unsafe_allow_html=True
-    )
-
+        <div style="font-size: 1.4rem; color: #ff6b6b; font-style: italic; margin-top: -10px;">
+            a flyfisher's wet dream
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
     # === TOGGLES ===
     col_t1, col_t2, col_t3 = st.columns(3)
     with col_t1:
