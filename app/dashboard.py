@@ -106,9 +106,9 @@ if time.time() - st.session_state.last_refresh > 60:
 
 # === HEADER ===
 st.markdown("""
-<div style="text-align: center; padding: 10px 0;">
-    <div style="font-size: 2.8rem; font-weight: bold; color: white;">River Dipstick</div>
-    <div style="font-size: 1.4rem; color: #ff6b6b; font-style: italic; margin-top: -10px;">a flyfisher's wet dream</div>
+<div style="text-align: left; padding: 0px 0;">
+    <div style="font-size: 2.2rem; font-weight: bold; color: white;">River Dipstick</div>
+    <div style="font-size: 1.2rem; color: #ff6b6b; font-style: italic; margin-top: -10px;">a flyfisher's wet dream</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -271,8 +271,10 @@ else:
 
 # === FOOTER ===
 st.markdown("""
-<div style="text-align: center; margin-top: 50px; color: #888; font-size: 0.9rem;">
-    Data: Environment Agency • Built with Streamlit • Vibe-coded by Tim & Grok<br>
+<div style="text-align: left; margin-top: 50px; color: #888; font-size: 0.9rem;">
+    All raw data sourced from the  Environment Agency API<br>
+    Built with Streamlit & Prophet ML<br>
+    Vibe-coded by Tim & Grok<br>
     <a href="https://buymeacoffee.com/riverdipstick" target="_blank">Buy me a coffee if I helped you catch a fish</a>
 </div>
 """, unsafe_allow_html=True)
