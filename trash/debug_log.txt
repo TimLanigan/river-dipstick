@@ -1,4 +1,0 @@
-Usage: streamlit run [OPTIONS] [TARGET] [ARGS]...
-Try 'streamlit run --help' for help.
-
-Error: No such option: --server.logLevel (Possible options: --server.allowRunOnSave, --server.port, --server.sslKeyFile)

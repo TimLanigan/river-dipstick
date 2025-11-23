@@ -1,0 +1,59 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: wintermute-db
+    restart: always
+    environment:
+      POSTGRES_DB: river_levels_db
+      POSTGRES_USER: river_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U river_user -d river_levels_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  dashboard:
+    build: .
+    container_name: dipstick-dashboard
+    restart: always
+    command:
+      - streamlit
+      - run
+      - /app/dashboard.py
+      - --server.port=8501
+      - --server.address=0.0.0.0
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./app:/app
+      - ./app/data:/app/data   # ← THIS IS THE CRITICAL LINE
+
+  collector:
+    build: .
+    container_name: wintermute-collector
+    restart: always
+    command:
+      - sh
+      - -c
+      - "while true; do echo \"=== $$(date) === Pulling EA data\"; python /app/get_readings.py; echo \"=== $$(date) === Predicting future\"; python /app/flatline_prophet.py; echo \"Sleeping 15 minutes...\"; sleep 900; done"
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    volumes:
+      - ./app:/app
+      - ./app/data:/app/data   # ← SAME HERE
+
+volumes:
+  postgres_data:

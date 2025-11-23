@@ -3,7 +3,7 @@
 riverdipstick/stations.py
 Central reference loader – CSV + EA API coordinates.
 """
-
+from pathlib import Path
 import csv
 import json
 import pathlib
@@ -19,7 +19,24 @@ from loguru import logger
 # Project root = directory that contains the `riverdipstick` package
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
-CSV_PATH = DATA_DIR / "stations.csv"
+from pathlib import Path
+
+# In Docker, data is mounted to /app/data
+CSV_PATH = Path("/app/data/stations.csv")
+
+def load_stations():
+    with open(CSV_PATH, newline='') as csvfile:
+        reader = csv.DictReader(csvfile)
+        stations = {}
+        for row in reader:
+            station_id = row['Station ID']
+            stations[station_id] = {
+                'river': row['River'],
+                'label': row['Label'],
+                'lat': float(row['Latitude']),
+                'lon': float(row['Longitude']),
+            }
+        return stations
 CACHE_PATH = DATA_DIR / "station_coords_cache.json"
 
 # Ensure data folder exists
@@ -63,57 +80,67 @@ def _save_cache(cache: Dict[str, Tuple[float, float]]):
 # --------------------------------------------------------------------------- #
 # CORE LOADER
 # --------------------------------------------------------------------------- #
-def load_stations() -> Dict[str, List[Dict]]:
-    """
-    Returns:
-        {
-            "Eden": [{"id": "760101", "label": "Kirkby Stephen", "lat": 54.47, "lon": -2.35}, ...],
-            ...
-        }
-    """
-    # ------------------------------------------------------------------- #
-    # 1. Create CSV if it doesn't exist
-    # ------------------------------------------------------------------- #
-    if not CSV_PATH.exists():
-        logger.info("stations.csv not found – creating default at {}", CSV_PATH)
-        CSV_PATH.write_text(DEFAULT_CSV_CONTENT.strip() + "\n", encoding="utf-8")
+def load_stations():
+    import csv
+    import json
+    import os
+    from loguru import logger
 
-    cache = _load_cache()
-    stations: Dict[str, List[Dict]] = {}
+    CSV_PATH = "/app/data/stations.csv"
+    CACHE_PATH = "/app/data/station_coords_cache.json"
 
-    with CSV_PATH.open(newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
+    STATIONS = {}
+
+    # Load cache
+    cache = {}
+    if os.path.exists(CACHE_PATH):
+        with open(CACHE_PATH, 'r') as f:
+            cache = json.load(f)
+
+    with open(CSV_PATH, newline='') as csvfile:
+        reader = csv.DictReader(csvfile)
         for row in reader:
             river = row["river"].strip()
-            sid   = row["station_id"].strip()
+            sid = row["station_id"].strip()
             label = row["label"].strip()
-            lat   = row["lat"].strip() or None
-            lon   = row["lon"].strip() or None
+            lat = row["lat"].strip()
+            lon = row["lon"].strip()
+            rainfall_id = row.get("rainfall_id", "").strip() or None  # ← CRITICAL LINE
 
-            # --------------------------------------------------------------- #
-            # Fill missing coordinates from EA API (cached)
-            # --------------------------------------------------------------- #
-            if not (lat and lon):
+            # Use CSV lat/lon if available
+            if lat and lon:
+                lat, lon = float(lat), float(lon)
+                cache[sid] = (lat, lon)
+                logger.debug(f"CSV hit for {sid} → {lat},{lon}")
+            else:
+                # Fallback to cache or API
                 if sid in cache:
                     lat, lon = cache[sid]
-                    logger.debug("Cache hit for {} → {},{}", sid, lat, lon)
+                    logger.debug(f"Cache hit for {sid} → {lat},{lon}")
                 else:
-                    lat, lon = _fetch_coords_from_ea(sid)
+                    lat, lon = fetch_coordinates_from_ea(sid)
                     if lat and lon:
                         cache[sid] = (lat, lon)
-                        _save_cache(cache)
+                        logger.debug(f"API hit for {sid} → {lat},{lon}")
                     else:
-                        logger.warning("No coords for station {}", sid)
+                        lat, lon = None, None
+                        logger.warning(f"No coordinates for {sid}")
 
-            entry = {
+            if river not in STATIONS:
+                STATIONS[river] = []
+            STATIONS[river].append({
                 "id": sid,
                 "label": label,
-                "lat": float(lat) if lat else None,
-                "lon": float(lon) if lon else None,
-            }
-            stations.setdefault(river, []).append(entry)
+                "lat": lat,
+                "lon": lon,
+                "rainfall_id": rainfall_id  # ← NOW INCLUDED
+            })
 
-    return stations
+    # Save updated cache
+    with open(CACHE_PATH, 'w') as f:
+        json.dump(cache, f, indent=2)
+
+    return STATIONS
 
 
 def _fetch_coords_from_ea(station_id: str) -> Tuple[float | None, float | None]:
@@ -143,3 +170,5 @@ if __name__ == "__main__":
     import pprint
     pprint.pprint(load_stations())
     sys.exit(0)
+# === AUTO-LOAD STATIONS FOR IMPORT ===
+STATIONS = load_stations()

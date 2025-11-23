@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 import os
 load_dotenv()
 DB_PASS = os.getenv("DB_PASSWORD")
-CONNECTION_STRING = f'postgresql://river_user:{DB_PASS}@localhost/river_levels_db'
+CONNECTION_STRING = f'postgresql://river_user:{DB_PASS}@db/river_levels_db'
 
 # --------------------------------------------------------------------------- #
 # DATABASE

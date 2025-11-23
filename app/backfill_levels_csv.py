@@ -11,7 +11,7 @@ import psycopg2
 import time
 from river_reference import STATIONS
 
-DB_CONN = 'postgresql://river_user:***REMOVED***@localhost/river_levels_db'
+DB_CONN = 'postgresql://river_user:***REMOVED***@db/river_levels_db'
 DAYS_BACK = 365
 CSV_URL_TEMPLATE = "https://environment.data.gov.uk/flood-monitoring/archive/readings-full-{date}.csv"
 

@@ -3,7 +3,6 @@
 dashboard.py - River Dipstick Dashboard
 Mega Graph: Level + Rain + Predictions
 """
-
 import streamlit as st
 import psycopg2
 import pandas as pd
@@ -11,34 +10,36 @@ import time
 import json
 import altair as alt
 from datetime import datetime, timedelta, UTC
-from dotenv import load_dotenv 
+from dotenv import load_dotenv
 import os
+
 load_dotenv()
 DB_PASS = os.getenv("DB_PASSWORD")
-CONNECTION_STRING = f'dbname=river_levels_db user=river_user password={DB_PASS} host=localhost'
+CONNECTION_STRING = f'postgresql://river_user:{DB_PASS}@db:5432/river_levels_db'
 
 # === IMPORT STATIONS (RELOAD ON EVERY RUN) ===
 from river_reference import load_stations
-STATIONS = load_stations()  # ← RELOAD FROM CSV
+STATIONS = load_stations()
 
-st.set_page_config(
-    page_title="River Dipstick",
-    page_icon="static/logo.png",  # Relative path
-    layout="wide"
-)
+# === LOAD RULES FOR COLOUR CODING (Docker + raw VPS compatible) ===
+from pathlib import Path
 
-RULES_FILE = '/home/river_levels_app/rules.json'
+RULES_FILE = Path("/app/data/rules.json")        # Docker path
+if not RULES_FILE.exists():
+    RULES_FILE = Path("/home/river_levels_app/rules.json")  # raw VPS fallback
 
-# Load rules from JSON
 try:
-    with open(RULES_FILE, 'r') as f:
+    with open(RULES_FILE, "r") as f:
         RULES = json.load(f)
 except FileNotFoundError:
     RULES = {}
-    st.warning("rules.json not found—color-coding disabled.")
+    st.warning("rules.json not found — colour-coding disabled.")
 
 # === PAGE SELECTOR ===
 page = st.sidebar.selectbox("Page", ["Dashboard", "About"])
+
+# Fix narrow layout after refresh — THIS IS THE LINE YOU NEED
+st.set_page_config(layout="wide")
 
 # === DATABASE FUNCTIONS ===
 def get_latest_readings():
@@ -115,8 +116,6 @@ if page == "About":
     col1, col2 = st.columns([8, 1])
     with col1:
         st.title("About River Dipstick")
-    with col2:
-        st.image("/home/river_levels_app/favicon.png", width=60)
 
     st.write("This app is designed to answer the eternal question...")
     st.markdown("*Will the river be good for fly fishing tomorrow?*")
