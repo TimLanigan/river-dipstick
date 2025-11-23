@@ -192,13 +192,13 @@ else:
                         past = pred[pred['Date'] < now].copy(); past['Type'] = 'Past Prediction'
                         future = pred[pred['Date'] >= now].copy(); future['Type'] = 'Future Prediction'
                         chart_data = pd.concat([chart_data, past, future], ignore_index=True)
-                        legend_items += [("Past Prediction", "#888888"), ("Future Prediction", "#BB22BB")]
+                        legend_items += [("Past Performance", "#888888"), ("Future Prediction", "#BB22BB")]
 
                 # Rain
                 rain_df = get_rainfall_data(station['id'])
                 if show_rain and not rain_df.empty:
                     chart_data = pd.concat([chart_data, rain_df], ignore_index=True)
-                    legend_items.append(("Rainfall", "lightblue"))
+                    legend_items.append(("Recent Rainfall", "lightblue"))
 
                 # Sweet Spot override
                 sweet = False
@@ -241,20 +241,20 @@ else:
                     st.altair_chart(chart, use_container_width=True)
                 else:
                     # Show legend on the right
-                    col_chart, col_legend = st.columns([5, 1])  # 5:1 ratio = chart dominates
+                    col_chart, col_legend = st.columns([6, 1])  # 6:1 ratio = chart dominates
                     with col_chart:
                         st.altair_chart(chart, use_container_width=True)
                     with col_legend:
                         st.markdown(
                             "<style>"
-                            ".small-legend { font-size: 0.7em !important; font-weight: 600; line-height: 1.6; }"
+                            ".small-legend { font-size: 0.8em !important; line-height: 1.6; }"
                             "</style>",
                             unsafe_allow_html=True
                         )
                         for label, color in legend_items:
                             st.markdown(
-                                f'<div class="small-legend" style="display:flex; align-items:right; margin:6px 0;">'
-                                f'<div style="width:16px; height:16px; background:{color}; border-radius:3px; margin-right:8px; flex-shrink:0;"></div>'
+                                f'<div class="small-legend" style="display:flex; align-items:center; margin:2px 0;">'
+                                f'<div style="width:16px; height:5px; background:{color}; border-radius:3px; margin-right:8px; flex-shrink:0;"></div>'
                                 f'{label}'
                                 f'</div>',
                                 unsafe_allow_html=True
