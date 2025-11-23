@@ -147,11 +147,11 @@ else:
     # === RESPONSIVE HEADER: TITLE + TAGLINE (CENTRED) ===
     st.markdown(
     """
-    <div style="text-align: center; padding: 10px 0;">
-        <div style="font-size: 2.8rem; font-weight: bold; color: white;">
+    <div style="text-align: center; padding: 0px 0;">
+        <div style="font-size: 2.2rem; font-weight: bold; color: white;">
             River Dipstick
         </div>
-        <div style="font-size: 1.4rem; color: #ff6b6b; font-style: italic; margin-top: -10px;">
+        <div style="font-size: 1.0rem; color: #ff6b6b; font-style: italic; margin-top: -10px; margin-bottom: 10px;">
             a flyfisher's wet dream
         </div>
     </div>
@@ -161,9 +161,9 @@ else:
     # === TOGGLES ===
     col_t1, col_t2, col_t3 = st.columns(3)
     with col_t1:
-        show_predictions = st.toggle("Predictions", value=False, key="show_predictions")
+        show_predictions = st.toggle("Level Predictions", value=False, key="show_predictions")
     with col_t2:
-        show_rain = st.toggle("Rain", value=False, key="show_rain", help="Show rainfall from nearest EA gauge")
+        show_rain = st.toggle("Rain History", value=False, key="show_rain", help="Show rainfall from nearest EA gauge")
     with col_t3:
         show_map = st.toggle("Map", value=False, key="show_map")
     # === DATA ===
