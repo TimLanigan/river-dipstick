@@ -143,10 +143,10 @@ def insert_rainfall(level_station_id, rainfall_station_id, rainfall_mm, timestam
 # --------------------------------------------------------------------------- #
 # GAPS (2 DAYS)
 # --------------------------------------------------------------------------- #
-def has_gaps(station_id, days=2):
+def has_gaps(station_id, days=7):
     conn = psycopg2.connect(CONNECTION_STRING)
     cursor = conn.cursor()
-    since = (datetime.now(UTC) - timedelta(days=days)).isoformat() + 'Z'
+    since = (datetime.now(UTC) - timedelta(hours=24)).replace(microsecond=0).isoformat()
     cursor.execute("SELECT COUNT(*) FROM readings WHERE station_id = %s AND timestamp >= %s", (station_id, since))
     count = cursor.fetchone()[0]
     expected = days * 96  # 15-min
