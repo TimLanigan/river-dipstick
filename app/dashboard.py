@@ -19,6 +19,7 @@ from pathlib import Path
 load_dotenv()
 DB_PASS = os.getenv("DB_PASSWORD")
 CONNECTION_STRING = f'postgresql://river_user:{DB_PASS}@db:5432/river_levels_db'
+REAL_LABEL = "Actual Level"
 
 st.set_page_config(layout="wide", page_title="River Dipstick")
 
@@ -64,7 +65,7 @@ def get_latest_readings():
     df['timestamp'] = pd.to_datetime(df['timestamp'])
     return df
 
-def get_historical_data(station_id, days=7):
+def get_historical_data(station_id, days=14):
     conn = psycopg2.connect(CONNECTION_STRING)
     start = (datetime.now(UTC) - timedelta(days=days)).isoformat()
     df = pd.read_sql_query("SELECT timestamp, level FROM readings WHERE station_id = %s AND timestamp >= %s ORDER BY timestamp", conn, params=(station_id, start))
@@ -72,10 +73,10 @@ def get_historical_data(station_id, days=7):
     if not df.empty:
         df['timestamp'] = pd.to_datetime(df['timestamp'])
         df = df.rename(columns={'timestamp': 'Date', 'level': 'Level (metres)'})
-        df['Type'] = 'Real'
+        df['Type'] = REAL_LABEL
     return df
 
-def get_predictions(station_id, days=7):
+def get_predictions(station_id, days=14):
     conn = psycopg2.connect(CONNECTION_STRING)
     start = (datetime.now(UTC) - timedelta(days=days)).isoformat()
     df = pd.read_sql_query("SELECT predicted_for, predicted_level FROM predictions WHERE station_id = %s AND predicted_for >= %s ORDER BY predicted_for", conn, params=(station_id, start))
@@ -86,7 +87,7 @@ def get_predictions(station_id, days=7):
         df['Type'] = 'Predicted'
     return df
 
-def get_rainfall_data(station_id, days=7):
+def get_rainfall_data(station_id, days=14):
     conn = psycopg2.connect(CONNECTION_STRING)
     start = (datetime.now(UTC) - timedelta(days=days)).isoformat()
     df = pd.read_sql_query("SELECT timestamp, rainfall_mm FROM rainfall_readings WHERE level_station_id = %s AND timestamp >= %s ORDER BY timestamp", conn, params=(station_id, start))
@@ -104,13 +105,24 @@ if time.time() - st.session_state.last_refresh > 60:
     st.session_state.last_refresh = time.time()
     st.rerun()
 
+
 # === HEADER ===
 st.markdown("""
-<div style="text-align: left; padding: 0px 0;">
+<div style="text-align: center; padding: 0px; margin-bottom: 10px">
     <div style="font-size: 2.2rem; font-weight: bold; color: white;">River Dipstick</div>
-    <div style="font-size: 1.2rem; color: #ff6b6b; font-style: italic; margin-top: -10px;">a flyfisher's wet dream</div>
+    <div style="font-size: 1.2rem; color: violet; font-style: italic; margin-top: -10px;">a flyfisher's wet dream</div>
 </div>
 """, unsafe_allow_html=True)
+
+# === DEV BADGE — ONLY SHOWS ON NON-PRODUCTION ===
+if os.getenv("ENVIRONMENT", "production") != "production":
+    st.markdown(
+        """
+        <div style="text-align: center; padding: 0px; margin-bottom: 10px">
+        <div style="font-size: 0.8rem; color: grey; margin-top: -10px;">development site</div>
+        """,
+        unsafe_allow_html=True
+    )
 
 # === TOGGLES ===
 c1, c2, c3, c4 = st.columns(4)
@@ -182,16 +194,26 @@ else:
                     continue
 
                 chart_data = hist.copy()
-                legend_items = [("Real", "steelblue")]
+                legend_items = [(REAL_LABEL, "steelblue")]
 
-                # Predictions
+                # Predictions — THIS IS THE FIXED VERSION
                 if show_predictions:
                     pred = get_predictions(station['id'])
                     if not pred.empty:
                         now = datetime.now(UTC)
-                        past = pred[pred['Date'] < now].copy(); past['Type'] = 'Past Prediction'
-                        future = pred[pred['Date'] >= now].copy(); future['Type'] = 'Future Prediction'
+
+                        # Past performance (grey dotted)
+                        past = pred[pred['Date'] < now].copy()
+                        past['Type'] = 'Past Performance'          # ← your new label
+
+                        # Future prediction (pink dotted)
+                        future = pred[pred['Date'] >= now].copy()
+                        future['Type'] = 'Future Prediction'       # ← your new label
+
+                        # Concat both — order matters!
                         chart_data = pd.concat([chart_data, past, future], ignore_index=True)
+
+                        # Update legend — must match exactly what we just set above
                         legend_items += [("Past Performance", "#888888"), ("Future Prediction", "#BB22BB")]
 
                 # Rain
@@ -211,7 +233,7 @@ else:
                     rain_ok = rain_df['Rainfall (mm)'].sum() >= cfg.get('rain_threshold', 8) if not rain_df.empty else False
                     sweet = falling and in_range and rain_ok
                     if sweet:
-                        legend_items[0] = ("SWEET SPOT!", "#00ff00")
+                        legend_items[0] = ("G SPOT!", "#00ff00")
 
                 chart_data['Date'] = pd.to_datetime(chart_data['Date'])
 
@@ -219,9 +241,18 @@ else:
                 level_line = alt.Chart(chart_data).mark_line(strokeWidth=4).encode(
                     x=alt.X('Date:T', title='Date'),
                     y=alt.Y('Level (metres):Q', axis=alt.Axis(title='Level (m)', titleColor='blue')),
-                    color=alt.Color('Type:N', scale=alt.Scale(domain=[x[0] for x in legend_items], range=[x[1] for x in legend_items]), legend=None),
-                    strokeDash=alt.condition(alt.datum.Type == 'Real', alt.value([0]), alt.value([6,4]))
-                ).transform_filter(alt.FieldOneOfPredicate(field='Type', oneOf=[x[0] for x in legend_items if 'Rainfall' not in x[0]]))
+                    color=alt.Color('Type:N', 
+                                    scale=alt.Scale(domain=[x[0] for x in legend_items], 
+                                                  range=[x[1] for x in legend_items]), 
+                                    legend=None),
+                    # ← This line now uses the variable instead of hard-coded 'Real'
+                    strokeDash=alt.condition(
+                        alt.datum.Type == REAL_LABEL,
+                        alt.value([0]),           # solid line for real data
+                        alt.value([6,4])          # dashed for predictions
+                    )
+                ).transform_filter(
+                    alt.FieldOneOfPredicate(field='Type', oneOf=[x[0] for x in legend_items if 'Rainfall' not in x[0]]))
 
                 rain_bars = alt.Chart(chart_data).mark_bar(opacity=0.3, size=3).encode(
                     x=alt.X('Date:T'),
@@ -262,16 +293,16 @@ else:
 
                 # Sweet Spot message
                 if show_sweet_spot:
-                    msg = "SWEET SPOT ACTIVE — GO FISHING NOW!" if sweet else "Waiting for the drop..."
+                    msg = "G SPOT ACTIVATED — GO FISHING NOW!" if sweet else ""
                     color = "lime" if sweet else "gray"
-                    st.markdown(f"<h2 style='color:{color};text-align:center'>{msg}</h2>", unsafe_allow_html=True)
+                    st.markdown(f"<h4 style='color:{color};text-align:center'>{msg}</h2>", unsafe_allow_html=True)
 
                 if show_map and station.get('lat') and station.get('lon'):
                     st.map(pd.DataFrame([{"lat": station['lat'], "lon": station['lon']}]), zoom=11)
 
 # === FOOTER ===
 st.markdown("""
-<div style="text-align: left; margin-top: 50px; color: #888; font-size: 0.9rem;">
+<div style="text-align: center; margin-top: 50px; color: #888; font-size: 0.9rem;">
     All raw data sourced from the  Environment Agency API<br>
     Built with Streamlit & Prophet ML<br>
     Vibe-coded by Tim & Grok<br>

@@ -1,85 +1,100 @@
 #!/usr/bin/env python3
 """
-backfill_levels_csv.py
-Backfill level data from EA CSV archives (1+ year)
+backfill_levels_one_year.py
+GO HARD OR GO HOME — 365 days of every reading for every station
 """
-
 import requests
 import csv
 from datetime import datetime, timedelta, UTC
 import psycopg2
 import time
+import sys
 from river_reference import STATIONS
+from dotenv import load_dotenv
+import os
 
-DB_CONN = 'postgresql://river_user:***REMOVED***@db/river_levels_db'
-DAYS_BACK = 365
+load_dotenv()
+DB_PASS = os.getenv("DB_PASSWORD")
+CONNECTION_STRING = f'postgresql://river_user:{DB_PASS}@db:5432/river_levels_db'
+
 CSV_URL_TEMPLATE = "https://environment.data.gov.uk/flood-monitoring/archive/readings-full-{date}.csv"
 
-conn = psycopg2.connect(DB_CONN)
+# FULL YEAR — 365 days
+DAYS_BACK = 365
+
+conn = psycopg2.connect(CONNECTION_STRING)
 cur = conn.cursor()
 
-def insert_reading(station_id, river, label, level, timestamp):
+def insert_reading(station_id, river, label, level, timestamp_str):
+    ts = timestamp_str.replace('Z', '+00')
     cur.execute("""
         INSERT INTO readings (station_id, river, label, level, timestamp)
         VALUES (%s, %s, %s, %s, %s)
         ON CONFLICT (station_id, timestamp) DO NOTHING
-    """, (station_id, river, label, level, timestamp))
-    conn.commit()
+    """, (station_id, river, label, level, ts))
 
-# Target: Add river from stations.csv
-target_river = 'River Hodder'
-target_stations = {s['id']: s['label'] for s in STATIONS[target_river]}
-
-print(f"Backfilling levels for {target_river} ({len(target_stations)} stations)")
+total_inserted = 0
+all_stations = {s['id']: (river, s['label']) for river in STATIONS for s in STATIONS[river]}
 
 end_date = datetime.now(UTC).date()
 start_date = end_date - timedelta(days=DAYS_BACK)
 current_date = start_date
 
-while current_date <= end_date:
+print(f"BACKFILLING ONE FULL YEAR ({DAYS_BACK} days) FOR ALL RIVERS — THIS IS WAR")
+
+for day in range(DAYS_BACK + 1):
+    current_date = start_date + timedelta(days=day)
     date_str = current_date.strftime('%Y-%m-%d')
     url = CSV_URL_TEMPLATE.format(date=date_str)
-    print(f"Fetching {date_str}...")
+    
+    print(f"[{day+1}/{DAYS_BACK+1}] Fetching {date_str}...", end="")
+    
+    for attempt in range(3):
+        try:
+            response = requests.get(url, stream=True, timeout=30)
+            if response.status_code == 404:
+                print(" → No data (weekend/holiday?)")
+                break
+            if response.status_code != 200:
+                print(f" → HTTP {response.status_code}")
+                break
 
-    try:
-        response = requests.get(url, stream=True, timeout=30)
-        if response.status_code != 200:
-            print(f"  → HTTP {response.status_code}")
-            current_date += timedelta(days=1)
-            time.sleep(1)
-            continue
+            daily = 0
+            reader = csv.DictReader(line.decode('utf-8', errors='ignore') for line in response.iter_lines() if line)
+            for row in reader:
+                ref = row.get('stationReference', '').strip()
+                if ref not in all_stations:
+                    continue
+                if 'level' not in row.get('measure', '').lower():
+                    continue
+                try:
+                    level = float(row.get('value', '').strip())
+                except:
+                    continue
+                ts = row.get('dateTime', '').strip()
+                if not ts:
+                    continue
+                
+                river, label = all_stations[ref]
+                insert_reading(ref, river, label, level, ts)
+                daily += 1
+                total_inserted += 1
 
-        reader = csv.DictReader(line.decode('utf-8') for line in response.iter_lines())
-        daily_inserts = 0
-        for row in reader:
-            station_ref = row.get('stationReference', '')
-            measure = row.get('measure', '')
-            value = row.get('value', '')
-            ts = row.get('dateTime', '')
-
-            if not (station_ref and measure and value and ts):
+            print(f" → {daily} readings")
+            break
+        except Exception as e:
+            if attempt < 2:
+                print(f" retry {attempt+1}")
+                time.sleep(5)
                 continue
-
-            if station_ref not in target_stations:
-                continue
-
-            if 'level' not in measure:
-                continue
-
-            try:
-                level = float(value)
-                label = target_stations[station_ref]
-                insert_reading(station_ref, target_river, label, level, ts)
-                daily_inserts += 1
-            except ValueError:
-                continue
-
-        print(f"  → {daily_inserts} level readings inserted")
-    except Exception as e:
-        print(f"  → Error: {e}")
-
-    current_date += timedelta(days=1)
-    time.sleep(1)
+            else:
+                print(f" → FAILED: {e}")
+                break
+    
+    conn.commit()
+    time.sleep(0.8)  # Be excellent to EA
 
 conn.close()
-print("LEVEL CSV BACKFILL COMPLETE")
+print(f"\nONE YEAR BACKFILL COMPLETE — {total_inserted:,} TOTAL READINGS INGESTED")
+print("THE BEAST IS FED.")
+print("PROPHET WILL NOW SPEAK TRUTH.")
