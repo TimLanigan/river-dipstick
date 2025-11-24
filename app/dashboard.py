@@ -196,24 +196,16 @@ else:
                 chart_data = hist.copy()
                 legend_items = [(REAL_LABEL, "steelblue")]
 
-                # Predictions — THIS IS THE FIXED VERSION
+                # Predictions
                 if show_predictions:
                     pred = get_predictions(station['id'])
                     if not pred.empty:
                         now = datetime.now(UTC)
-
-                        # Past performance (grey dotted)
                         past = pred[pred['Date'] < now].copy()
-                        past['Type'] = 'Past Performance'          # ← your new label
-
-                        # Future prediction (pink dotted)
+                        past['Type'] = 'Past Performance'
                         future = pred[pred['Date'] >= now].copy()
-                        future['Type'] = 'Future Prediction'       # ← your new label
-
-                        # Concat both — order matters!
+                        future['Type'] = 'Future Prediction'
                         chart_data = pd.concat([chart_data, past, future], ignore_index=True)
-
-                        # Update legend — must match exactly what we just set above
                         legend_items += [("Past Performance", "#888888"), ("Future Prediction", "#BB22BB")]
 
                 # Rain
@@ -241,18 +233,17 @@ else:
                 level_line = alt.Chart(chart_data).mark_line(strokeWidth=4).encode(
                     x=alt.X('Date:T', title='Date'),
                     y=alt.Y('Level (metres):Q', axis=alt.Axis(title='Level (m)', titleColor='blue')),
-                    color=alt.Color('Type:N', 
-                                    scale=alt.Scale(domain=[x[0] for x in legend_items], 
-                                                  range=[x[1] for x in legend_items]), 
-                                    legend=None),
-                    # ← This line now uses the variable instead of hard-coded 'Real'
+                    color=alt.Color('Type:N',
+                        scale=alt.Scale(domain=[x[0] for x in legend_items], range=[x[1] for x in legend_items]),
+                        legend=None),
                     strokeDash=alt.condition(
                         alt.datum.Type == REAL_LABEL,
-                        alt.value([0]),           # solid line for real data
-                        alt.value([6,4])          # dashed for predictions
+                        alt.value([0]),
+                        alt.value([6,4])
                     )
                 ).transform_filter(
-                    alt.FieldOneOfPredicate(field='Type', oneOf=[x[0] for x in legend_items if 'Rainfall' not in x[0]]))
+                    alt.FieldOneOfPredicate(field='Type', oneOf=[x[0] for x in legend_items if 'Rainfall' not in x[0]])
+                )
 
                 rain_bars = alt.Chart(chart_data).mark_bar(opacity=0.3, size=3).encode(
                     x=alt.X('Date:T'),
@@ -264,38 +255,26 @@ else:
                 if show_rain and not rain_df.empty:
                     chart = (level_line + rain_bars).resolve_scale(y='independent')
 
-                chart = chart.properties(height=320, title="chart:")
+                chart = chart.properties(height=320)
 
-                # === PERFECT LAYOUT: FULL WIDTH CHART + OPTIONAL TINY LEGEND ===
+                # === PERFECT LEGEND + FULL WIDTH CHART ===
                 if len(legend_items) == 1:
-                    # Only Real → full width, no legend
                     st.altair_chart(chart, use_container_width=True)
                 else:
-                    # Show legend on the right
-                    col_chart, col_legend = st.columns([6, 1])  # 6:1 ratio = chart dominates
-                    with col_chart:
-                        st.altair_chart(chart, use_container_width=True)
-                    with col_legend:
-                        st.markdown(
-                            "<style>"
-                            ".small-legend { font-size: 0.8em !important; line-height: 1.6; }"
-                            "</style>",
-                            unsafe_allow_html=True
-                        )
-                        for label, color in legend_items:
-                            st.markdown(
-                                f'<div class="small-legend" style="display:flex; align-items:center; margin:2px 0;">'
-                                f'<div style="width:16px; height:5px; background:{color}; border-radius:3px; margin-right:8px; flex-shrink:0;"></div>'
-                                f'{label}'
-                                f'</div>',
-                                unsafe_allow_html=True
-                            )
+                    # Tiny, beautiful legend above chart
+                    legend_html = '<div style="text-align:center; margin:10px 0; padding:6px; background:rgba(30,30,30,0.7); border-radius:8px; font-size:0.8em;">'
+                    for label, color in legend_items:
+                        legend_html += f'<span style="margin:0 12px; display:inline-flex; align-items:center;">'
+                        legend_html += f'<div style="width:16px; height:4px; background:{color}; border-radius:2px; margin-right:6px;"></div>{label}</span>'
+                    legend_html += '</div>'
+                    st.markdown(legend_html, unsafe_allow_html=True)
+                    st.altair_chart(chart, use_container_width=True)
 
                 # Sweet Spot message
                 if show_sweet_spot:
-                    msg = "G SPOT ACTIVATED — GO FISHING NOW!" if sweet else ""
+                    msg = "G SPOT ACTIVATED — GO FISHING NOW!" if sweet else "Waiting for the drop..."
                     color = "lime" if sweet else "gray"
-                    st.markdown(f"<h4 style='color:{color};text-align:center'>{msg}</h2>", unsafe_allow_html=True)
+                    st.markdown(f"<h3 style='color:{color}; text-align:center; margin:20px 0;'>{msg}</h3>", unsafe_allow_html=True)
 
                 if show_map and station.get('lat') and station.get('lon'):
                     st.map(pd.DataFrame([{"lat": station['lat'], "lon": station['lon']}]), zoom=11)
@@ -305,7 +284,7 @@ st.markdown("""
 <div style="text-align: center; margin-top: 50px; color: #888; font-size: 0.9rem;">
     All raw data sourced from the  Environment Agency API<br>
     Built with Streamlit & Prophet ML<br>
-    Vibe-coded by Tim & Grok<br>
+    Vibe-coded by tim<br>
     <a href="https://buymeacoffee.com/riverdipstick" target="_blank">Buy me a coffee if I helped you catch a fish</a>
 </div>
 """, unsafe_allow_html=True)
