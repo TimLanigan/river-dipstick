@@ -19,7 +19,7 @@ from pathlib import Path
 load_dotenv()
 DB_PASS = os.getenv("DB_PASSWORD")
 CONNECTION_STRING = f'postgresql://river_user:{DB_PASS}@db:5432/river_levels_db'
-REAL_LABEL = "Actual Level"
+REAL_LABEL = "Measured Level"
 
 st.set_page_config(layout="wide", page_title="River Dipstick")
 
@@ -109,7 +109,7 @@ if time.time() - st.session_state.last_refresh > 60:
 # === HEADER ===
 st.markdown("""
 <div style="text-align: center; padding: 0px; margin-bottom: 10px">
-    <div style="font-size: 2.2rem; font-weight: bold; color: white;">River Dipstick</div>
+    <div style="font-size: 2.2rem; font-weight: bold; color: grey;">River Dipstick</div>
     <div style="font-size: 1.2rem; color: violet; font-style: italic; margin-top: -10px;">a flyfisher's wet dream</div>
 </div>
 """, unsafe_allow_html=True)
@@ -212,7 +212,7 @@ else:
                 rain_df = get_rainfall_data(station['id'])
                 if show_rain and not rain_df.empty:
                     chart_data = pd.concat([chart_data, rain_df], ignore_index=True)
-                    legend_items.append(("Recent Rainfall", "lightblue"))
+                    legend_items.append((" Rainfall", "lightblue"))
 
                 # Sweet Spot override
                 sweet = False
@@ -262,7 +262,7 @@ else:
                     st.altair_chart(chart, use_container_width=True)
                 else:
                     # Tiny, beautiful legend above chart
-                    legend_html = '<div style="text-align:center; margin:10px 0; padding:6px; background:rgba(30,30,30,0.7); border-radius:8px; font-size:0.8em;">'
+                    legend_html = '<div style="text-align:right; margin:10px 0; padding:6px; border-radius:8px; font-size:0.8em;">'
                     for label, color in legend_items:
                         legend_html += f'<span style="margin:0 12px; display:inline-flex; align-items:center;">'
                         legend_html += f'<div style="width:16px; height:4px; background:{color}; border-radius:2px; margin-right:6px;"></div>{label}</span>'
