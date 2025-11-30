@@ -1,4 +1,3 @@
-cat > .vscode/settings.json << 'EOF'
 {
   "files.exclude": {
     "**/.git": true,
@@ -32,7 +31,7 @@ cat > .vscode/settings.json << 'EOF'
   "git.autofetch": true,
   "git.confirmSync": false,
   "editor.formatOnSave": true,
-  "editor.fontSize": 13,                   // ← smaller, exactly as requested
+  "editor.fontSize": 12,                   // ← smaller, exactly as requested
   "editor.tabSize": 4,
   "editor.renderWhitespace": "boundary",
   "workbench.startupEditor": "none",

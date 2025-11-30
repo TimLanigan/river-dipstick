@@ -21,7 +21,6 @@ __pycache__/
 
 # Logs & temp files
 *.log
-*.txt
 log.txt
 nohup.out
 
@@ -52,7 +51,3 @@ data/station_coords_cache.json
 
 # Anything you throw in a trash folder while testing
 trash/
-
-# VS Code settings (optional – keep if you want to share workspace config)
-# .vscode/
-# !.vscode/settings.json   # <-- uncomment if you want to share some settings
