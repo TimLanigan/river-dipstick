@@ -1,0 +1,29 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Dashboard → docker-compose (full rebuild & start)",
+      "type": "shell",
+      "command": "docker-compose",
+      "args": ["up", "-d", "--build", "dashboard"],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Dashboard → quick restart (no rebuild)",
+      "type": "shell",
+      "command": "docker-compose",
+      "args": ["restart", "dashboard"],
+      "group": "build"
+    }
+  ]
+}

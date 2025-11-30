@@ -1,0 +1,40 @@
+cat > .vscode/settings.json << 'EOF'
+{
+  "files.exclude": {
+    "**/.git": true,
+    "**/.svn": true,
+    "**/.hg": true,
+    "**/CVS": true,
+    "**/.DS_Store": true,
+    "**/__pycache__": true,
+    "**/*.pyc": true,
+    "venv-nicegui": true,
+    "river-dipstick": true
+  },
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/node_modules/*/**": true,
+    "**/venv*": true
+  },
+  "python.defaultInterpreterPath": "/usr/bin/python3",
+  "python.linting.enabled": true,
+  "python.linting.flake8Enabled": true,
+  "python.formatting.provider": "black",
+  "terminal.integrated.defaultProfile.linux": "bash",
+  "terminal.integrated.env.linux": {
+    "DOCKER_BUILDKIT": "1",
+    "COMPOSE_DOCKER_CLI_BUILD": "1"
+  },
+  "docker.showExplorer": true,
+  "task.autoDetect": "off",
+  "task.saveBeforeRun": "always",
+  "git.autofetch": true,
+  "git.confirmSync": false,
+  "editor.formatOnSave": true,
+  "editor.fontSize": 13,                   // ← smaller, exactly as requested
+  "editor.tabSize": 4,
+  "editor.renderWhitespace": "boundary",
+  "workbench.startupEditor": "none",
+  "workbench.colorTheme": "Dark Modern"    // ← your actual theme
+}

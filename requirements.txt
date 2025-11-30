@@ -1,0 +1,9 @@
+streamlit
+psycopg2-binary
+pandas
+plotly
+altair
+python-dotenv
+prophet
+httpx
+loguru
