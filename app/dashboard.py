@@ -4,7 +4,9 @@ River Dipstick — FINAL PERFECTION
 Full-width chart by default
 Tiny, beautiful, dynamic legend ONLY when needed
 Works perfectly on mobile and desktop
+G SPOT now uses good_level column → clean green dots, no more line joins
 """
+
 import streamlit as st
 import psycopg2
 import pandas as pd
@@ -18,7 +20,7 @@ from pathlib import Path
 
 load_dotenv()
 DB_PASS = os.getenv("DB_PASSWORD")
-CONNECTION_STRING = f'postgresql://river_user:{DB_PASS}@db:5432/river_levels_db'
+CONNECTION_STRING = f'postgresql://river_user:{DB_PASS}@wintermute-db:5432/river_levels_db'
 REAL_LABEL = "Measured Level"
 
 st.set_page_config(layout="wide", page_title="River Dipstick")
@@ -73,7 +75,7 @@ def get_historical_data(station_id, days=14):
     conn = psycopg2.connect(CONNECTION_STRING)
     start = (datetime.now(UTC) - timedelta(days=days)).isoformat()
     df = pd.read_sql_query("""
-        SELECT timestamp, level FROM readings
+        SELECT timestamp, level, good_level FROM readings
         WHERE station_id = %s AND timestamp >= %s
         ORDER BY timestamp
     """, conn, params=(station_id, start))
@@ -124,17 +126,17 @@ if time.time() - st.session_state.last_refresh > 60:
 # === HEADER ===
 st.markdown("""
 <div style="text-align: center; padding: 0px; margin-bottom: 10px">
-    <div style="font-size: 2.2rem; font-weight: bold; color: grey;">River Dipstick</div>
-    <div style="font-size: 1.2rem; color: violet; font-style: italic; margin-top: -10px;">a flyfisher's wet dream</div>
+<div style="font-size: 2.2rem; font-weight: bold; color: grey;">River Dipstick</div>
+<div style="font-size: 1.2rem; color: violet; font-style: italic; margin-top: -10px;">a flyfisher's wet dream</div>
 </div>
 """, unsafe_allow_html=True)
 
 # === DEV BADGE ===
 if os.getenv("ENVIRONMENT", "production") != "production":
     st.markdown("""
-        <div style="text-align: center; padding: 0px; margin-bottom: 10px">
-        <div style="font-size: 0.8rem; color: grey; margin-top: -10px;">development site</div>
-        </div>
+    <div style="text-align: center; padding: 0px; margin-bottom: 10px">
+    <div style="font-size: 0.8rem; color: grey; margin-top: -10px;">development site</div>
+    </div>
     """, unsafe_allow_html=True)
 
 # === TOGGLES ===
@@ -221,8 +223,7 @@ else:
                     chart_data = pd.concat([chart_data, rain_df], ignore_index=True)
                     legend_items.append((" Rainfall", "lightblue"))
 
-
-                # === G SPOT — segmented, no straight-line joins, plays nice with others ===
+                # === MAIN LEVEL LINE ===
                 level_line = alt.Chart(chart_data).mark_line(strokeWidth=4).encode(
                     x=alt.X('Date:T', title='Date'),
                     y=alt.Y('Level (metres):Q', axis=alt.Axis(title='Level (m)', titleColor='blue')),
@@ -239,49 +240,32 @@ else:
                     alt.FieldOneOfPredicate(field='Type', oneOf=[x[0] for x in legend_items if 'Rainfall' not in x[0]])
                 )
 
+                # === G SPOT — clean green dots from DB ===
                 if show_sweet_spot:
-                    cfg = RULES.get(str(station['id']), {}).get('good_fishing', {})
-                    if cfg:
-                        falling_start = cfg.get('falling_start', 0.9)
-                        falling_end = cfg.get('falling_end', 0.4)
-                        rain_threshold = cfg.get('rain_threshold', 8)
+                    gspot_points = hist[hist.get('good_level') == 'y']
+                    if not gspot_points.empty:
+                        gspot_dots = alt.Chart(gspot_points).mark_circle(
+                            size=50,
+                            color='limegreen',
+                            stroke='limegreen',
+                            strokeWidth=1
+                        ).encode(
+                            x='Date:T',
+                            y='Level (metres):Q'
+                        )
+                        level_line = level_line + gspot_dots
+                        legend_items.append(("Good Level", "limegreen"))
 
-                        total_rain = rain_df['Rainfall (mm)'].sum() if not rain_df.empty else 0
-                        rain_ok = total_rain >= rain_threshold
-
-                        # Mark G-Spot points
-                        hist['in_gspot'] = False
-                        for i in range(len(hist)):
-                            cur_level = hist.iloc[i]['Level (metres)']
-                            start_idx = max(0, i - 7)
-                            recent = hist['Level (metres)'].iloc[start_idx:i+1]
-                            falling = len(recent) >= 4 and recent.is_monotonic_decreasing
-                            in_range = falling_end <= cur_level <= falling_start
-                            if falling and in_range and rain_ok:
-                                hist.loc[hist.index[i], 'in_gspot'] = True
-
-                        gspot_data = hist[hist['in_gspot']].copy()
-
-                        if not gspot_data.empty:
-                            # Create segment column using index position (not datetime)
-                            gspot_data = gspot_data.copy()
-                            # Reset index so we can use row numbers
-                            gspot_data = gspot_data.reset_index(drop=True)
-                            # New segment every time there's a gap of 1 or more rows
-                            gspot_data['segment'] = (gspot_data.index.to_series().diff() > 1).cumsum()
-                            gspot_line = alt.Chart(gspot_data).mark_line(strokeWidth=5, color='#00ff00').encode(
-                                x='Date:T',
-                                y='Level (metres):Q',
-                                detail='segment:N'  # Force nominal type — no more errors
-                            )
-                            level_line = alt.layer(level_line, gspot_line)
-                            legend_items.append(("G SPOT!", "#00ff00"))
-                        
-                        if hist.iloc[-1]['in_gspot']:
-                            st.markdown("<h3 style='color:lime; text-align:center; margin:20px 0;'>G SPOT ACTIVE!!</h3>", unsafe_allow_html=True)
+                    # Big banner if currently active
+                    if not hist.empty and hist.iloc[-1].get('good_level') == 'y':
+                        st.markdown("""
+                        <h4 style="color:limegreen; text-align:right; font-size:0.8rem;">
+                        G Spot found, go fishing!!!
+                        </h4>
+                        """, unsafe_allow_html=True)
 
                 # === RAIN BARS ===
-                rain_bars = alt.Chart(chart_data).mark_bar(opacity=0.3, size=3).encode(
+                rain_bars = alt.Chart(chart_data).mark_bar(opacity=0.2, size=5).encode(
                     x=alt.X('Date:T'),
                     y=alt.Y('Rainfall (mm):Q', axis=alt.Axis(title='Rain (mm)', titleColor='lightblue')),
                     color=alt.value('lightblue')
@@ -311,9 +295,9 @@ else:
 # === FOOTER ===
 st.markdown("""
 <div style="text-align: center; margin-top: 50px; color: #888; font-size: 0.9rem;">
-    All raw data sourced from the Environment Agency API<br>
-    Built with Streamlit & Prophet ML<br>
-    Vibe-coded by tim<br>
-    <a href="https://buymeacoffee.com/riverdipstick" target="_blank">Buy me a coffee if I helped you catch a fish</a>
+All raw data sourced from the Environment Agency API<br>
+Built with Streamlit & Prophet ML<br>
+Vibe-coded by tim<br>
+<a href="https://buymeacoffee.com/riverdipstick" target="_blank">Buy me a coffee if I helped you catch a fish</a>
 </div>
 """, unsafe_allow_html=True)

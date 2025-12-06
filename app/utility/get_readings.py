@@ -1,24 +1,35 @@
 #!/usr/bin/env python3
 """
 get_readings.py - 15-min collection
-Optimized: Fresh data check + 2-day gap backfill + retry + logging
+Now with permanent, error-free G SPOT detection
 """
 
 import requests
 import psycopg2
 from datetime import datetime, timedelta, UTC
 import time
+import json
+from pathlib import Path
 from loguru import logger
 from river_reference import STATIONS
 from dotenv import load_dotenv
 import os
+
 load_dotenv()
 DB_PASS = os.getenv("DB_PASSWORD")
 CONNECTION_STRING = f'postgresql://river_user:{DB_PASS}@db/river_levels_db'
 
-# --------------------------------------------------------------------------- #
-# DATABASE
-# --------------------------------------------------------------------------- #
+# === LOAD RULES ===
+RULES_PATH = Path("/app/data/rules.json")
+if not RULES_PATH.exists():
+    RULES_PATH = Path("/home/river_levels_app/rules.json")
+try:
+    RULES = json.loads(RULES_PATH.read_text())
+except Exception as e:
+    logger.error(f"Failed to load rules.json: {e}")
+    RULES = {}
+
+# === DATABASE ===
 def init_db():
     conn = psycopg2.connect(CONNECTION_STRING)
     cursor = conn.cursor()
@@ -30,6 +41,7 @@ def init_db():
             label TEXT NOT NULL,
             level REAL,
             timestamp TEXT NOT NULL,
+            good_level TEXT DEFAULT 'n',
             UNIQUE(station_id, timestamp)
         )
     ''')
@@ -46,9 +58,7 @@ def init_db():
     conn.commit()
     conn.close()
 
-# --------------------------------------------------------------------------- #
-# API WITH RETRY
-# --------------------------------------------------------------------------- #
+# === API ===
 def api_get(url, params=None):
     for attempt in range(3):
         try:
@@ -60,9 +70,7 @@ def api_get(url, params=None):
             time.sleep(5)
     return None
 
-# --------------------------------------------------------------------------- #
-# LEVELS
-# --------------------------------------------------------------------------- #
+# === LEVELS ===
 def get_latest_river_level(station_id):
     url = f"https://environment.data.gov.uk/flood-monitoring/id/stations/{station_id}/readings"
     data = api_get(url, params={"latest": "", "parameter": "level"})
@@ -83,21 +91,71 @@ def insert_reading(station_id, river, label, level, timestamp):
     cursor = conn.cursor()
     try:
         cursor.execute('''
-            INSERT INTO readings (station_id, river, label, level, timestamp)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO readings (station_id, river, label, level, timestamp, good_level)
+            VALUES (%s, %s, %s, %s, %s, 'n')
             ON CONFLICT (station_id, timestamp) DO NOTHING
         ''', (station_id, river, label, level, timestamp))
+
         if cursor.rowcount:
-            logger.info(f"Inserted level {level:.3f}m for {label} ({station_id})")
+            logger.info(f"Inserted {level:.3f}m @ {label}")
+            try:
+                evaluate_g_spot(cursor, station_id, timestamp, level)
+            except Exception as e:
+                logger.error(f"G SPOT eval failed: {e}")
+
         conn.commit()
     except Exception as e:
-        logger.error(f"DB insert error: {e}")
+        logger.error(f"Insert failed: {e}")
     finally:
+        cursor.close()
         conn.close()
 
-# --------------------------------------------------------------------------- #
-# RAINFALL
-# --------------------------------------------------------------------------- #
+# === G SPOT EVALUATION ===
+def evaluate_g_spot(cursor, station_id: str, ts_iso: str, current_level: float):
+    cfg = RULES.get(station_id, {}).get("good_fishing")
+    if not cfg:
+        return
+
+    start_lvl = cfg.get("falling_start", 999)
+    end_lvl   = cfg.get("falling_end",   0)
+    rain_thr  = cfg.get("rain_threshold", 0)
+
+    ts = datetime.fromisoformat(ts_iso.replace("Z", "+00:00"))
+    two_h_ago      = ts - timedelta(hours=2)
+    fourteen_d_ago = ts - timedelta(days=14)
+
+    # Falling?
+    cursor.execute("""
+        SELECT level FROM readings
+        WHERE station_id = %s AND timestamp >= %s AND timestamp <= %s
+        ORDER BY timestamp
+    """, (station_id, two_h_ago, ts_iso))
+    recent = [r[0] for r in cursor.fetchall()]
+    falling = len(recent) >= 4 and all(recent[i] >= recent[i+1] for i in range(len(recent)-1))
+
+    # In band?
+    in_band = end_lvl <= current_level <= start_lvl
+
+    # 14-day rain (TEXT column)
+    cursor.execute("""
+        SELECT COALESCE(SUM(rainfall_mm), 0)
+        FROM rainfall_readings
+        WHERE level_station_id = %s AND timestamp::timestamptz >= %s
+    """, (station_id, fourteen_d_ago))
+    rain_total = cursor.fetchone()[0] or 0
+    rain_ok = rain_total >= rain_thr
+
+    flag = 'y' if (falling and in_band and rain_ok) else 'n'
+
+    cursor.execute("""
+        UPDATE readings SET good_level = %s
+        WHERE station_id = %s AND timestamp = %s
+    """, (flag, station_id, ts_iso))
+
+    if cursor.rowcount:
+        logger.success(f"G SPOT → {flag.upper()} | {station_id} {current_level:.3f}m")
+
+# === RAINFALL ===
 def get_latest_rainfall(rainfall_id):
     url = f"https://environment.data.gov.uk/flood-monitoring/id/stations/{rainfall_id}/readings"
     data = api_get(url, params={"latest": "", "parameter": "rainfall"})
@@ -118,44 +176,32 @@ def insert_rainfall(level_station_id, rainfall_station_id, rainfall_mm, timestam
     cursor = conn.cursor()
     try:
         cursor.execute('''
-            INSERT INTO rainfall_readings (level_station_id, rainfall_station_id, rainfall_mm, timestamp)
+            INSERT INTO rainfall_readings
+            (level_station_id, rainfall_station_id, rainfall_mm, timestamp)
             VALUES (%s, %s, %s, %s)
             ON CONFLICT (level_station_id, timestamp) DO NOTHING
         ''', (level_station_id, rainfall_station_id, rainfall_mm, timestamp))
         if cursor.rowcount:
-            logger.info(f"Inserted rainfall {rainfall_mm}mm for {level_station_id} from {rainfall_station_id}")
-        conn.commit()
-    except psycopg2.errors.UndefinedObject:
-        # Fallback if constraint missing
-        cursor.execute('''
-            INSERT INTO rainfall_readings (level_station_id, rainfall_station_id, rainfall_mm, timestamp)
-            VALUES (%s, %s, %s, %s)
-            ON CONFLICT DO NOTHING
-        ''', (level_station_id, rainfall_station_id, rainfall_mm, timestamp))
-        if cursor.rowcount:
-            logger.info(f"Inserted rainfall {rainfall_mm}mm for {level_station_id} (fallback)")
+            logger.info(f"Inserted {rainfall_mm}mm rain for {level_station_id}")
         conn.commit()
     except Exception as e:
-        logger.error(f"DB insert error: {e}")
+        logger.error(f"Rain insert error: {e}")
     finally:
+        cursor.close()
         conn.close()
 
-# --------------------------------------------------------------------------- #
-# GAPS (2 DAYS)
-# --------------------------------------------------------------------------- #
+# === GAPS ===
 def has_gaps(station_id, days=7):
     conn = psycopg2.connect(CONNECTION_STRING)
     cursor = conn.cursor()
     since = (datetime.now(UTC) - timedelta(hours=24)).replace(microsecond=0).isoformat()
     cursor.execute("SELECT COUNT(*) FROM readings WHERE station_id = %s AND timestamp >= %s", (station_id, since))
     count = cursor.fetchone()[0]
-    expected = days * 96  # 15-min
+    expected = days * 96
     conn.close()
     return count < expected * 0.9
 
-# --------------------------------------------------------------------------- #
-# MAIN
-# --------------------------------------------------------------------------- #
+# === MAIN ===
 if __name__ == "__main__":
     init_db()
     logger.info("Starting 15-min collection")
@@ -177,7 +223,7 @@ if __name__ == "__main__":
                 if rain is not None:
                     insert_rainfall(sid, rain_id, rain, rts or ts)
 
-            # Gap backfill (2 days)
+            # Gap backfill
             if has_gaps(sid):
                 logger.warning(f"Gaps in {sid} — backfilling 2 days")
                 since = (datetime.now(UTC) - timedelta(days=2)).strftime('%Y-%m-%dT%H:%M:%SZ')
@@ -189,4 +235,4 @@ if __name__ == "__main__":
 
             time.sleep(1)
 
-    logger.info("Collection complete")
+    logger.info("Collection complete — G SPOTs updated")

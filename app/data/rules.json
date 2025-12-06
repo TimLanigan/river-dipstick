@@ -8,9 +8,9 @@
       { "min": 1.2, "max": null, "color": "red" }
     ],
     "good_fishing": {
-      "falling_start": 0.9,
-      "falling_end": 0.3,
-      "rain_threshold": 8
+      "falling_start": 0.6,
+      "falling_end": 0.4,
+      "rain_threshold": 2
     }
   },
   "710301": {
@@ -24,7 +24,7 @@
     "good_fishing": {
       "falling_start": 1.0,
       "falling_end": 0.5,
-      "rain_threshold": 8
+      "rain_threshold": 2
     }
   },
   "713040": {
@@ -36,9 +36,9 @@
       { "min": 1.5, "max": null, "color": "red" }
     ],
     "good_fishing": {
-      "falling_start": 1.0,
-      "falling_end": 0.5,
-      "rain_threshold": 8
+      "falling_start": 0.8,
+      "falling_end": 0.4,
+      "rain_threshold": 4
     }
   }
 }
