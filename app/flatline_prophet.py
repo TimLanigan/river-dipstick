@@ -26,8 +26,8 @@ def get_engine():
 def get_historical_for_prediction(station_id, rainfall_id):
     engine = get_engine()
     
-    # === GET LEVELS (30 days, hourly) ===
-    start_date = (datetime.now(UTC) - timedelta(days=30)).isoformat()
+    # === GET LEVELS (14 days, hourly) ===
+    start_date = (datetime.now(UTC) - timedelta(days=14)).isoformat()
     level_query = """
         SELECT timestamp, level 
         FROM readings 
@@ -40,14 +40,14 @@ def get_historical_for_prediction(station_id, rainfall_id):
         print(f"Not enough level data for {station_id}")
         return None
 
-    # === GET RAINFALL (7 days, hourly) ===
+    # === GET RAINFALL (14 days, hourly) ===
     rain_query = """
         SELECT timestamp, rainfall_mm 
         FROM rainfall_readings 
         WHERE level_station_id = %s AND timestamp >= %s 
         ORDER BY timestamp
     """
-    rain_start = (datetime.now(UTC) - timedelta(days=10)).isoformat()
+    rain_start = (datetime.now(UTC) - timedelta(days=14)).isoformat()
     rain_df = pd.read_sql_query(rain_query, engine, params=(station_id, rain_start))
     
     # === RESAMPLE TO HOURLY + STRIP TIMEZONE ===
@@ -75,9 +75,9 @@ def train_and_predict(station_id, rainfall_id):
 
     # === PROPHET WITH RAIN REGRESSOR ===
     m = Prophet(
-        yearly_seasonality=False,
-        weekly_seasonality=True,
-        daily_seasonality=True,
+        yearly_seasonality=True,
+        weekly_seasonality=False,
+        daily_seasonality=False,
         changepoint_prior_scale=0.05
     )
     m.add_regressor('rainfall')

@@ -17,23 +17,24 @@
     "**/venv*": true
   },
   "python.defaultInterpreterPath": "/usr/bin/python3",
-  "python.linting.enabled": true,
-  "python.linting.flake8Enabled": true,
-  "python.formatting.provider": "black",
   "terminal.integrated.defaultProfile.linux": "bash",
   "terminal.integrated.env.linux": {
     "DOCKER_BUILDKIT": "1",
     "COMPOSE_DOCKER_CLI_BUILD": "1"
   },
-  "docker.showExplorer": true,
   "task.autoDetect": "off",
   "task.saveBeforeRun": "always",
   "git.autofetch": true,
   "git.confirmSync": false,
+  "editor.semanticTokenColorCustomizations": {},
   "editor.formatOnSave": true,
-  "editor.fontSize": 12,                   // ← smaller, exactly as requested
-  "editor.tabSize": 4,
-  "editor.renderWhitespace": "boundary",
+  "editor.fontSize": 12, // ← smaller, exactly as requested
+  "editor.tokenColorCustomizations": {
+    "comments": "#3ec740",
+    "keywords": "#8e79e3",
+  },
+  "python.analysis.diagnosticSeverityOverrides": {
+    "reportMissingImports": "none"},
   "workbench.startupEditor": "none",
-  "workbench.colorTheme": "Dark Modern"    // ← your actual theme
+  "workbench.colorTheme": "GitHub Dark Mode" // ← your actual theme
 }

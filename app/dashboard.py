@@ -63,9 +63,10 @@ def apply_styles(row):
 def get_latest_readings():
     conn = psycopg2.connect(CONNECTION_STRING)
     df = pd.read_sql_query("""
-        SELECT station_id, river, label, level, timestamp
-        FROM readings
-        WHERE id IN (SELECT MAX(id) FROM readings GROUP BY station_id)
+    SELECT DISTINCT ON (station_id)
+    station_id, river, label, level, timestamp
+    FROM readings
+    ORDER BY station_id, timestamp DESC
     """, conn)
     conn.close()
     df['timestamp'] = pd.to_datetime(df['timestamp'])
@@ -240,21 +241,26 @@ else:
                     alt.FieldOneOfPredicate(field='Type', oneOf=[x[0] for x in legend_items if 'Rainfall' not in x[0]])
                 )
 
-                # === G SPOT — clean green dots from DB ===
+                # === G SPOT — FIXED: dots now locked to the measured level line, never float again ===
                 if show_sweet_spot:
-                    gspot_points = hist[hist.get('good_level') == 'y']
-                    if not gspot_points.empty:
-                        gspot_dots = alt.Chart(gspot_points).mark_circle(
-                            size=50,
-                            color='limegreen',
-                            stroke='limegreen',
-                            strokeWidth=1
+                    gspot_rows = hist[hist.get('good_level') == 'y'].copy()
+
+                    if not gspot_rows.empty:
+                        gspot_dots = alt.Chart(gspot_rows).mark_circle(
+                            size=20,                  # perfect size – visible but not thicc
+                            color='lime',             # bright pure lime
+                            opacity=1,
+                            stroke='lime',
+                            strokeWidth=2           # crisp outline
                         ).encode(
                             x='Date:T',
-                            y='Level (metres):Q'
+                            y=alt.Y('Level (metres):Q', title='Level (m)'),
+                            tooltip=['Date:T', 'Level (metres):Q']
                         )
+
+                        # Add the dots BEFORE we resolve_scale to independent
                         level_line = level_line + gspot_dots
-                        legend_items.append(("Good Level", "limegreen"))
+                        legend_items.append(("Good Level", "lime"))
 
                     # Big banner if currently active
                     if not hist.empty and hist.iloc[-1].get('good_level') == 'y':
@@ -274,8 +280,10 @@ else:
                 # === FINAL CHART ===
                 chart = level_line
                 if show_rain and not rain_df.empty:
-                    chart = (level_line + rain_bars).resolve_scale(y='independent')
-                chart = chart.properties(height=320)
+                    # Add rain bars on secondary axis but DO NOT let them mess with primary scale
+                    chart = alt.layer(level_line, rain_bars).resolve_scale(y='independent')
+                else:
+                    chart = level_line
 
                 # === LEGEND + CHART ===
                 if len(legend_items) == 1:
