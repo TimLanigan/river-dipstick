@@ -143,7 +143,7 @@ if os.getenv("ENVIRONMENT", "production") != "production":
 # === TOGGLES ===
 c1, c2, c3, c4 = st.columns(4)
 with c1: show_predictions = st.toggle("Level Predictions", False)
-with c2: show_sweet_spot = st.toggle("G Spot", False)
+with c2: show_sweet_spot = st.toggle("Find the G Spot", False)
 with c3: show_rain = st.toggle("Rain History", False)
 with c4: show_map = st.toggle("Map", False)
 
@@ -227,7 +227,7 @@ else:
                 # === MAIN LEVEL LINE ===
                 level_line = alt.Chart(chart_data).mark_line(strokeWidth=4).encode(
                     x=alt.X('Date:T', title='Date'),
-                    y=alt.Y('Level (metres):Q', axis=alt.Axis(title='Level (m)', titleColor='blue')),
+                    y=alt.Y('Level (metres):Q', axis=alt.Axis(title='Level (m)', titleColor='white')),
                     color=alt.Color('Type:N',
                         scale=alt.Scale(domain=[x[0] for x in legend_items], range=[x[1] for x in legend_items]),
                         legend=None
@@ -273,7 +273,7 @@ else:
                 # === RAIN BARS ===
                 rain_bars = alt.Chart(chart_data).mark_bar(opacity=0.2, size=5).encode(
                     x=alt.X('Date:T'),
-                    y=alt.Y('Rainfall (mm):Q', axis=alt.Axis(title='Rain (mm)', titleColor='lightblue')),
+                    y=alt.Y('Rainfall (mm):Q', axis=alt.Axis(title='Rain (mm)', titleColor='white')),
                     color=alt.value('lightblue')
                 ).transform_filter(alt.datum.Type == 'Rainfall')
 
