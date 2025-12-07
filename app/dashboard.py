@@ -4,7 +4,7 @@ River Dipstick — FINAL PERFECTION
 Full-width chart by default
 Tiny, beautiful, dynamic legend ONLY when needed
 Works perfectly on mobile and desktop
-G SPOT now uses good_level column → clean green dots, no more line joins
+G SPOT uses good_level column → clean lime dots
 """
 
 import streamlit as st
@@ -23,9 +23,9 @@ DB_PASS = os.getenv("DB_PASSWORD")
 CONNECTION_STRING = f'postgresql://river_user:{DB_PASS}@wintermute-db:5432/river_levels_db'
 REAL_LABEL = "Measured Level"
 
-st.set_page_config(layout="wide", page_title="River Dipstick")
+st.set_page_config(layout="wide", page_title="River Dipstick", page_icon="🎣")
 
-# === STATIONS & RULES ===
+# === STATIONS & RULES (only good_fishing part is used for G-spot) ===
 from river_reference import load_stations
 STATIONS = load_stations()
 
@@ -38,35 +38,14 @@ try:
 except FileNotFoundError:
     RULES = {}
 
-# === STYLING FUNCTION ===
-def apply_styles(row):
-    styles = [''] * len(row)
-    level_idx = row.index.get_loc('level')
-    station_id = str(row['station_id'])
-    level = row['level']
-    if station_id in RULES and isinstance(RULES[station_id], dict) and 'levels' in RULES[station_id]:
-        for rule in RULES[station_id]['levels']:
-            min_val = rule['min']
-            max_val = rule['max'] if rule['max'] is not None else float('inf')
-            if min_val <= level < max_val:
-                color = rule['color']
-                if color == 'red':
-                    styles[level_idx] = 'background-color: red; color: white;'
-                elif color == 'yellow':
-                    styles[level_idx] = 'background-color: yellow; color: black;'
-                elif color == 'lightgreen':
-                    styles[level_idx] = 'background-color: lightgreen; color: black;'
-                break
-    return styles
-
 # === DATABASE HELPERS ===
 def get_latest_readings():
     conn = psycopg2.connect(CONNECTION_STRING)
     df = pd.read_sql_query("""
-    SELECT DISTINCT ON (station_id)
-    station_id, river, label, level, timestamp
-    FROM readings
-    ORDER BY station_id, timestamp DESC
+        SELECT DISTINCT ON (station_id)
+        station_id, river, label, level, timestamp
+        FROM readings
+        ORDER BY station_id, timestamp DESC
     """, conn)
     conn.close()
     df['timestamp'] = pd.to_datetime(df['timestamp'])
@@ -153,16 +132,18 @@ if df.empty:
     st.write("No data yet.")
 else:
     tabs = st.tabs(["Eden", "Ribble", "Lune", "Hodder"])
+
     for tab, river in zip(tabs, ["Eden", "Ribble", "Lune", "Hodder"]):
         with tab:
             stations = STATIONS.get(river, [])
             stations = sorted(stations, key=lambda x: x.get('lat', 0)) if river == "Eden" else sorted(stations, key=lambda x: x.get('lat', 0), reverse=True)
             river_df = df[df['river'] == river].copy()
+
             if river_df.empty:
                 st.write("No data.")
                 continue
 
-            # === FINAL TABLE ===
+            # === FINAL TABLE (no colour coding any more) ===
             latest = river_df.loc[river_df.groupby('station_id')['timestamp'].idxmax()]
             latest = latest.set_index('station_id').reindex([s['id'] for s in stations]).dropna(subset=['river']).reset_index()
 
@@ -173,31 +154,12 @@ else:
                 'station_id': latest['station_id']
             })
 
-            def color_level_column(row):
-                station_id = str(row['station_id'])
-                level = latest.iloc[row.name]['level']
-                bg = ''
-                if station_id in RULES and 'levels' in RULES[station_id]:
-                    for rule in RULES[station_id]['levels']:
-                        min_val = rule['min']
-                        max_val = rule['max'] if rule['max'] is not None else float('inf')
-                        if min_val <= level < max_val:
-                            color = rule['color']
-                            if color == 'red':
-                                bg = 'background-color: red; color: white;'
-                            elif color == 'yellow':
-                                bg = 'background-color: yellow; color: black;'
-                            elif color == 'lightgreen':
-                                bg = 'background-color: lightgreen; color: black;'
-                            break
-                return ['', bg, '', '']
-            styled = display_df.style.apply(color_level_column, axis=1)
-            st.dataframe(styled, use_container_width=True, hide_index=True)
+            # Clean table – no styling function any more
+            st.dataframe(display_df, use_container_width=True, hide_index=True)
 
             # === CHARTS FOR EACH STATION ===
             for station in stations:
                 st.write(f"### {station['label']}")
-
                 hist = get_historical_data(station['id'])
                 if hist.empty:
                     st.write("No data.")
@@ -226,8 +188,8 @@ else:
 
                 # === MAIN LEVEL LINE ===
                 level_line = alt.Chart(chart_data).mark_line(strokeWidth=4).encode(
-                x=alt.X('Date:T', title='Date',
-                        axis=alt.Axis(format='%b %d', tickCount=14)),
+                    x=alt.X('Date:T', title='Date',
+                            axis=alt.Axis(format='%b %d', tickCount=14)),
                     y=alt.Y('Level (metres):Q', axis=alt.Axis(title='Level (m)', titleColor='white')),
                     color=alt.Color('Type:N',
                         scale=alt.Scale(domain=[x[0] for x in legend_items], range=[x[1] for x in legend_items]),
@@ -242,28 +204,24 @@ else:
                     alt.FieldOneOfPredicate(field='Type', oneOf=[x[0] for x in legend_items if 'Rainfall' not in x[0]])
                 )
 
-                # === G SPOT — FIXED: dots now locked to the measured level line, never float again ===
+                # === G SPOT (completely untouched) ===
                 if show_sweet_spot:
                     gspot_rows = hist[hist.get('good_level') == 'y'].copy()
-
                     if not gspot_rows.empty:
                         gspot_dots = alt.Chart(gspot_rows).mark_circle(
-                            size=20,                  # perfect size – visible but not thicc
-                            color='lime',             # bright pure lime
+                            size=20,
+                            color='lime',
                             opacity=1,
                             stroke='lime',
-                            strokeWidth=2           # crisp outline
+                            strokeWidth=2
                         ).encode(
                             x='Date:T',
                             y=alt.Y('Level (metres):Q', title='Level (m)'),
                             tooltip=['Date:T', 'Level (metres):Q']
                         )
-
-                        # Add the dots BEFORE we resolve_scale to independent
                         level_line = level_line + gspot_dots
                         legend_items.append(("Good Level", "lime"))
 
-                    # Big banner if currently active
                     if not hist.empty and hist.iloc[-1].get('good_level') == 'y':
                         st.markdown("""
                         <h4 style="color:limegreen; text-align:right; font-size:0.8rem;">
@@ -281,10 +239,7 @@ else:
                 # === FINAL CHART ===
                 chart = level_line
                 if show_rain and not rain_df.empty:
-                    # Add rain bars on secondary axis but DO NOT let them mess with primary scale
                     chart = alt.layer(level_line, rain_bars).resolve_scale(y='independent')
-                else:
-                    chart = level_line
 
                 # === LEGEND + CHART ===
                 if len(legend_items) == 1:

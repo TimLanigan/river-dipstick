@@ -1,12 +1,5 @@
 {
   "760112": {
-    "levels": [
-      { "min": 0.0, "max": 0.2, "color": "red" },
-      { "min": 0.2, "max": 0.3, "color": "yellow" },
-      { "min": 0.3, "max": 0.31, "color": "lightgreen" },
-      { "min": 1.0, "max": 1.2, "color": "yellow" },
-      { "min": 1.2, "max": null, "color": "red" }
-    ],
     "good_fishing": {
       "falling_start": 0.6,
       "falling_end": 0.4,
@@ -14,13 +7,6 @@
     }
   },
   "710301": {
-    "levels": [
-      { "min": 0.0, "max": 0.2, "color": "red" },
-      { "min": 0.2, "max": 0.5, "color": "yellow" },
-      { "min": 0.5, "max": 1.0, "color": "lightgreen" },
-      { "min": 1.0, "max": 1.5, "color": "yellow" },
-      { "min": 1.5, "max": null, "color": "red" }
-    ],
     "good_fishing": {
       "falling_start": 1.0,
       "falling_end": 0.5,
@@ -28,13 +14,6 @@
     }
   },
   "713040": {
-    "levels": [
-      { "min": 0.0, "max": 0.2, "color": "red" },
-      { "min": 0.2, "max": 0.5, "color": "yellow" },
-      { "min": 0.5, "max": 1.0, "color": "lightgreen" },
-      { "min": 1.0, "max": 1.5, "color": "yellow" },
-      { "min": 1.5, "max": null, "color": "red" }
-    ],
     "good_fishing": {
       "falling_start": 0.8,
       "falling_end": 0.4,
