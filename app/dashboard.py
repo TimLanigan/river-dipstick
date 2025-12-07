@@ -168,7 +168,7 @@ else:
                 'station_id': latest['station_id']
             })
 
-            # Clean table – no styling function any more
+            # Clean table
             st.dataframe(display_df, use_container_width=True, hide_index=True)
 
             # === CHARTS FOR EACH STATION ===

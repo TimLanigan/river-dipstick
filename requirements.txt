@@ -7,3 +7,4 @@ python-dotenv
 prophet
 httpx
 loguru
+SQLAlchemy==2.0.35
