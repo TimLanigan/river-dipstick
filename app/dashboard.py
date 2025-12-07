@@ -25,6 +25,11 @@ REAL_LABEL = "Measured Level"
 
 st.set_page_config(layout="wide", page_title="River Dipstick", page_icon="🎣")
 
+st.markdown("""<style> 
+.main .block-container {padding-top: 0rem; margin-top: 0px;}#MainMenu { margin-top: -1rem; }
+</style>
+""", unsafe_allow_html=True)
+
 # === STATIONS & RULES (only good_fishing part is used for G-spot) ===
 from river_reference import load_stations
 STATIONS = load_stations()
@@ -105,9 +110,18 @@ if time.time() - st.session_state.last_refresh > 60:
 
 # === HEADER ===
 st.markdown("""
-<div style="text-align: center; padding: 0px; margin-bottom: 10px">
-<div style="font-size: 2.2rem; font-weight: bold; color: grey;">River Dipstick</div>
-<div style="font-size: 1.2rem; color: violet; font-style: italic; margin-top: -10px;">a flyfisher's wet dream</div>
+<div style="text-align:center; padding:0.5rem 0 1rem; margin-top: -5.5rem;">
+  <h1 style="
+    font-size:3.4rem;
+    font-weight:800;
+    background:linear-gradient(90deg,#ff1493,#ff69b4,#ff1493);
+    -webkit-background-clip:text;
+    background-clip:text;
+    color:transparent;
+    text-shadow:0 0 30px rgba(255,20,147,0.4);
+    margin:0;
+    letter-spacing:-1px;
+  ">River Dipstick</h1>
 </div>
 """, unsafe_allow_html=True)
 
