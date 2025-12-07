@@ -34,7 +34,9 @@ services:
       - "8501:8501"
     volumes:
       - ./app:/app
-      - ./app/data:/app/data   # ← THIS IS THE CRITICAL LINE
+      - ./app/data:/app/data
+      - ./app/.streamlit:/app/.streamlit
+
 
   collector:
     build: .
@@ -52,6 +54,7 @@ services:
     volumes:
       - ./app:/app
       - ./app/data:/app/data   # ← SAME HERE
+      - ./app/.streamlit:/app/.streamlit
 
 volumes:
   postgres_data:
