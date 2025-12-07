@@ -125,14 +125,6 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# === DEV BADGE ===
-if os.getenv("ENVIRONMENT", "production") != "production":
-    st.markdown("""
-    <div style="text-align: center; padding: 0px; margin-bottom: 10px">
-    <div style="font-size: 0.8rem; color: grey; margin-top: -10px;">development site</div>
-    </div>
-    """, unsafe_allow_html=True)
-
 # === TOGGLES ===
 c1, c2, c3, c4 = st.columns(4)
 with c1: show_predictions = st.toggle("Level Predictions", False)
