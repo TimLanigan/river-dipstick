@@ -226,7 +226,8 @@ else:
 
                 # === MAIN LEVEL LINE ===
                 level_line = alt.Chart(chart_data).mark_line(strokeWidth=4).encode(
-                    x=alt.X('Date:T', title='Date'),
+                x=alt.X('Date:T', title='Date',
+                        axis=alt.Axis(format='%b %d', tickCount=14)),
                     y=alt.Y('Level (metres):Q', axis=alt.Axis(title='Level (m)', titleColor='white')),
                     color=alt.Color('Type:N',
                         scale=alt.Scale(domain=[x[0] for x in legend_items], range=[x[1] for x in legend_items]),

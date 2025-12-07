@@ -15,10 +15,6 @@ __pycache__/
 *.pyo
 *.pyd
 
-# Streamlit
-.streamlit/
-.streamlit/secrets.toml
-
 # Logs & temp files
 *.log
 log.txt
