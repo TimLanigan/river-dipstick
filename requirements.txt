@@ -7,4 +7,9 @@ python-dotenv
 prophet
 httpx
 loguru
-SQLAlchemy==2.0.35
+SQLAlchemy==2.0.35jupyterlab
+plotly
+scikit-learn
+xgboost
+lightgbm
+joblib
