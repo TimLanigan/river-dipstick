@@ -112,7 +112,7 @@ if time.time() - st.session_state.last_refresh > 60:
 st.markdown("""
 <div style="text-align:center; padding:0.5rem 0 1rem; margin-top: -5.5rem;">
   <h1 style="
-    font-size:3.4rem;
+    font-size:2rem;
     font-weight:800;
     background:linear-gradient(90deg,#ff1493,#ff69b4,#ff1493);
     -webkit-background-clip:text;
