@@ -1,0 +1,53 @@
+/* Full-bleed but with 1rem breathing room */
+div[data-testid="stAppViewContainer"] > .main {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+}
+
+.block-container {
+    padding-left: 1.4rem !important;
+    padding-right: 1rem !important;
+    max-width: 100% !important;
+}
+
+/* Slim, dark top bar */
+[data-testid="stToolbar"] {
+    height: 1rem !important;
+    min-height: 1rem !important;
+    backround color: #b44cecff;
+}
+
+/* Icons stay visible */
+[data-testid="collapsedControl"],
+[data-testid="stToolbarActions"] button {
+    color: #b44cecff !important;
+}
+
+.block-container {
+    padding-top: 1rem !important;
+    margin-top: 1rem !important;
+}
+
+/* River tab labels – safe targeting the tab button (text inherits safely) */
+.stTabs [data-baseweb="tab"] {
+    font-size: 2rem !important;
+    font-weight: 500 !important;
+}
+
+/* Active tab underline and colour */
+.stTabs [data-baseweb="tab"][aria-selected="true"] {
+    border-bottom: 2px solid #b44cec !important;
+    color: #b44cec !important;
+    font-weight: 600 !important;        /* Slightly bolder active */
+}
+
+/* Space between tabs */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 16px !important;
+}
+
+/* Smaller station labels above each chart – targets h3 Markdown headings */
+h3 {
+    font-size: 1rem !important;
+    font-weight: 500 !important;
+}

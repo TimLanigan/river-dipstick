@@ -1,2 +1,0 @@
-*/15 * * * * python /app/get_readings.py >> /var/log/collector.log 2>&1
-5 * * * * python /app/flatline_prophet.py >> /var/log/predictor.log 2>&1

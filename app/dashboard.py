@@ -23,12 +23,40 @@ DB_PASS = os.getenv("DB_PASSWORD")
 CONNECTION_STRING = f'postgresql://river_user:{DB_PASS}@wintermute-db:5432/river_levels_db'
 REAL_LABEL = "Measured Level"
 
-st.set_page_config(layout="wide", page_title="River Dipstick", page_icon="🎣")
+def load_css(file_path):
+    with open(file_path) as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
-st.markdown("""<style> 
-.main .block-container {padding-top: 0rem; margin-top: 0px;}#MainMenu { margin-top: -1rem; }
-</style>
-""", unsafe_allow_html=True)
+st.set_page_config(
+    layout="wide",
+    page_title="River Dipstick",
+    page_icon="🎣",
+    initial_sidebar_state="collapsed"
+)
+
+load_css("style.css")
+
+# Clean sidebar title
+with st.sidebar:
+    st.markdown(
+        """
+        <h2 style="
+            color: #b44cec;
+            font-weight: 700;
+            font-size: 1.2rem;
+            margin-top: -1.2rem;      /* ← sue me */
+            margin-bottom: 0rem;
+            text-align: left;
+        ">River Dipstick</h2>
+        """,
+        unsafe_allow_html=True
+)
+    st.markdown("---")  # Thin divider for clarity
+    
+    show_predictions = st.toggle("Level Predictions", value=False)
+    show_sweet_spot = st.toggle("Find the G Spot", value=False)
+    show_rain = st.toggle("Rain History", value=False)
+    show_map = st.toggle("Map", value=False)    
 
 # === STATIONS & RULES (only good_fishing part is used for G-spot) ===
 from river_reference import load_stations
@@ -108,29 +136,7 @@ if time.time() - st.session_state.last_refresh > 60:
     st.session_state.last_refresh = time.time()
     st.rerun()
 
-# === HEADER ===
-st.markdown("""
-<div style="text-align:center; padding:0.5rem 0 1rem; margin-top: -5.5rem;">
-  <h1 style="
-    font-size:2rem;
-    font-weight:800;
-    background:linear-gradient(90deg,#ff1493,#ff69b4,#ff1493);
-    -webkit-background-clip:text;
-    background-clip:text;
-    color:transparent;
-    text-shadow:0 0 30px rgba(255,20,147,0.4);
-    margin:0;
-    letter-spacing:-1px;
-  ">River Dipstick</h1>
-</div>
-""", unsafe_allow_html=True)
 
-# === TOGGLES ===
-c1, c2, c3, c4 = st.columns(4)
-with c1: show_predictions = st.toggle("Level Predictions", False)
-with c2: show_sweet_spot = st.toggle("Find the G Spot", False)
-with c3: show_rain = st.toggle("Rain History", False)
-with c4: show_map = st.toggle("Map", False)
 
 # === MAIN DASHBOARD ===
 df = get_latest_readings()
@@ -172,7 +178,7 @@ else:
                     continue
 
                 chart_data = hist.copy()
-                legend_items = [(REAL_LABEL, "steelblue")]
+                legend_items = [(REAL_LABEL, "#ad36eeff")]
 
                 # Predictions
                 if show_predictions:
@@ -236,7 +242,7 @@ else:
                         """, unsafe_allow_html=True)
 
                 # === RAIN BARS ===
-                rain_bars = alt.Chart(chart_data).mark_bar(opacity=0.2, size=5).encode(
+                rain_bars = alt.Chart(chart_data).mark_bar(opacity=0.1, size=5).encode(
                     x=alt.X('Date:T'),
                     y=alt.Y('Rainfall (mm):Q', axis=alt.Axis(title='Rain (mm)', titleColor='white')),
                     color=alt.value('lightblue')
@@ -264,7 +270,7 @@ else:
 
 # === FOOTER ===
 st.markdown("""
-<div style="text-align: center; margin-top: 50px; color: #888; font-size: 0.9rem;">
+<div style="text-align: left; margin-top: 50px; color: #888; font-size: 0.9rem;">
 All raw data sourced from the Environment Agency API<br>
 Built with Streamlit & Prophet ML<br>
 Vibe-coded by tim<br>

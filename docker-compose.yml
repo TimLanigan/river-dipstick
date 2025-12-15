@@ -42,10 +42,7 @@ services:
     build: .
     container_name: wintermute-collector
     restart: always
-    command:
-      - sh
-      - -c
-      - "while true; do echo \"=== $$(date) === Pulling EA data\"; python /app/get_readings.py; echo \"=== $$(date) === Predicting future\"; python /app/flatline_prophet.py; echo \"Sleeping 15 minutes...\"; sleep 900; done"
+    command: sh -c "mkdir -p /app/logs && while true; do echo \"=== $$(date) === Pulling EA data\"; python /app/get_readings.py >> /app/logs/get_readings.log 2>&1; echo \"=== $$(date) === Predicting future\"; python /app/level_predictor.py >> /app/logs/level_predictor.log 2>&1; echo \"=== $$(date) === Finding gspot\"; python /app/update_gspot.py >> /app/logs/gspot.log 2>&1; echo \"=== $$(date) === Finished cycle\"; echo \"Sleeping 15 minutes...\"; sleep 900; done"
     depends_on:
       db:
         condition: service_healthy
@@ -53,8 +50,11 @@ services:
       - .env
     volumes:
       - ./app:/app
-      - ./app/data:/app/data   # ← SAME HERE
-      - ./app/.streamlit:/app/.streamlit
+      - ./app/data:/app/data
+      - ./notebooks:/app/notebooks
+      - /opt/river-dipstick/logs:/app/logs
+    ports:
+      - "8888:8888"
 
 volumes:
   postgres_data:
