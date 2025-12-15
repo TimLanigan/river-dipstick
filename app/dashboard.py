@@ -58,6 +58,18 @@ with st.sidebar:
     show_rain = st.toggle("Rain History", value=False)
     show_map = st.toggle("Map", value=False)    
 
+    st.markdown("")  # Small spacer
+
+    # Days selector for graphs – default 7 days (mobile-friendly)
+    days_options = [3, 7, 14, 21, 30, 60, 365]  # Your expanded list – feel free to adjust order
+    default_days_idx = days_options.index(7)  # Sets 7 as default selection
+    selected_days = st.selectbox(
+        "Graph history (days)",
+        options=days_options,
+        index=default_days_idx,
+        help="7 days default for mobile. Choose more for extra context."
+    )
+
 # === STATIONS & RULES (only good_fishing part is used for G-spot) ===
 from river_reference import load_stations
 STATIONS = load_stations()
@@ -84,7 +96,7 @@ def get_latest_readings():
     df['timestamp'] = pd.to_datetime(df['timestamp'])
     return df
 
-def get_historical_data(station_id, days=14):
+def get_historical_data(station_id, days=selected_days):
     conn = psycopg2.connect(CONNECTION_STRING)
     start = (datetime.now(UTC) - timedelta(days=days)).isoformat()
     df = pd.read_sql_query("""
@@ -99,7 +111,7 @@ def get_historical_data(station_id, days=14):
         df['Type'] = REAL_LABEL
     return df
 
-def get_predictions(station_id, days=14):
+def get_predictions(station_id, days=selected_days):
     conn = psycopg2.connect(CONNECTION_STRING)
     start = (datetime.now(UTC) - timedelta(days=days)).isoformat()
     df = pd.read_sql_query("""
@@ -114,7 +126,7 @@ def get_predictions(station_id, days=14):
         df['Type'] = 'Predicted'
     return df
 
-def get_rainfall_data(station_id, days=14):
+def get_rainfall_data(station_id, days=selected_days):
     conn = psycopg2.connect(CONNECTION_STRING)
     start = (datetime.now(UTC) - timedelta(days=days)).isoformat()
     df = pd.read_sql_query("""
@@ -221,7 +233,7 @@ else:
                     gspot_rows = hist[hist.get('good_level') == 'y'].copy()
                     if not gspot_rows.empty:
                         gspot_dots = alt.Chart(gspot_rows).mark_circle(
-                            size=20,
+                            size=10,
                             color='lime',
                             opacity=1,
                             stroke='lime',

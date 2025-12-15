@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 update_gspot.py – Incremental update for good_level flags.
-Run every 15 mins after data pull. Processes only recent un-flagged readings.
-Place in the same directory as backfill_gspot.py (or /app/utility/ in collector).
+Rain threshold removed – g-spot = falling + in band only
+Relaxed falling detection: allow at most 1 small rise (≤0.01m) in ~2h window
 """
 import psycopg2
 from datetime import datetime, timedelta
@@ -15,14 +15,11 @@ import os
 
 load_dotenv()
 DB_PASS = os.getenv("DB_PASSWORD")
-CONN = f'postgresql://river_user:{DB_PASS}@db/river_levels_db'  # Adjust if your conn string differs
-
-# Path fallback like backfill
+CONN = f'postgresql://river_user:{DB_PASS}@db/river_levels_db'
 RULES_PATH = Path("/app/data/rules.json")
 if not RULES_PATH.exists():
-    RULES_PATH = Path("/home/river_levels_app/rules.json")  # Or your host path
+    RULES_PATH = Path("/home/river_levels_app/rules.json")
 RULES = json.loads(RULES_PATH.read_text())
-
 UTC = ZoneInfo("UTC")
 
 # Log to file for easy checking
@@ -32,7 +29,7 @@ def update_station(station_id):
     conn = psycopg2.connect(CONN)
     cur = conn.cursor()
 
-    # Look back 2 days – covers rain window with buffer, keeps it fast
+    # Look back 2 days – buffer for falling check
     since_dt = datetime.now(UTC) - timedelta(days=2)
     cur.execute("""
         SELECT timestamp, level
@@ -47,7 +44,7 @@ def update_station(station_id):
         conn.close()
         return
 
-    logger.info(f"Updating G SPOT for {station_id} — {len(rows)} readings")
+    logger.info(f"Updating G SPOT for {station_id} — {len(rows)} pending readings")
     cfg = RULES.get(station_id, {}).get("good_fishing")
     if not cfg:
         logger.warning(f"No rules for {station_id}")
@@ -56,36 +53,28 @@ def update_station(station_id):
 
     start_lvl = cfg["falling_start"]
     end_lvl = cfg["falling_end"]
-    rain_thr = cfg["rain_threshold"]
     gspot_count = 0
 
     for ts_tz, level in rows:
         two_h_ago = ts_tz - timedelta(hours=2)
-        fourteen_d_ago = ts_tz - timedelta(days=14)
 
-        # Falling check (last ~2 hours, need 4+ points, non-increasing)
+        # 1. Falling? (allow at most 1 small rise ≤0.01m)
         cur.execute("""
             SELECT level FROM readings
             WHERE station_id = %s AND timestamp >= %s AND timestamp <= %s
             ORDER BY timestamp
         """, (station_id, two_h_ago, ts_tz))
         recent = [r[0] for r in cur.fetchall()]
-        falling = len(recent) >= 4 and all(recent[i] >= recent[i+1] for i in range(len(recent)-1))
+        if len(recent) >= 4:
+            rises = sum(1 for i in range(len(recent)-1) if recent[i] < recent[i+1] - 0.001)
+            falling = rises <= 1
+        else:
+            falling = False
 
-        # In band
+        # 2. In band?
         in_band = end_lvl <= level <= start_lvl
 
-        # 14-day rain total >= threshold (as per original code)
-        cur.execute("""
-            SELECT COALESCE(SUM(rainfall_mm), 0)
-            FROM rainfall_readings
-            WHERE level_station_id = %s
-              AND timestamp::timestamptz >= %s
-        """, (station_id, fourteen_d_ago))
-        rain_total = cur.fetchone()[0] or 0
-        rain_ok = rain_total >= rain_thr
-
-        flag = 'y' if (falling and in_band and rain_ok) else 'n'
+        flag = 'y' if (falling and in_band) else 'n'
         if flag == 'y':
             gspot_count += 1
 

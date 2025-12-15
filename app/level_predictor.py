@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 LIVE PREDICTOR — FINAL VERSION (no flat line)
-Uses current state + iterative prediction
+Dynamic lookback: limited to available rainfall data range
 """
 import pandas as pd
 from sqlalchemy import create_engine, text
@@ -9,6 +9,8 @@ import joblib
 import os
 from datetime import datetime, timedelta
 from river_reference import STATIONS
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
 
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 engine = create_engine(f"postgresql://river_user:{DB_PASSWORD}@db/river_levels_db")
@@ -36,22 +38,33 @@ for river, stations in STATIONS.items():
         model_path = f"{MODEL_DIR}/{sid}_hgboost.pkl"
         if not os.path.exists(model_path):
             continue
-
         model = joblib.load(model_path)
 
-        # Pull last 500 hours
+        # Step 1: Find earliest available rainfall timestamp for this station
+        rain_start_query = f"""
+            SELECT MIN(timestamp::timestamptz) AS min_ts
+            FROM rainfall_readings
+            WHERE level_station_id = %s
+        """
+        rain_start_df = pd.read_sql(rain_start_query, engine, params=(sid,))
+        if rain_start_df['min_ts'].iloc[0] is None:
+            print(f"No rainfall data for {sid} — skipping")
+            continue
+        rain_start = rain_start_df['min_ts'].iloc[0]
+
+        # Step 2: Pull level + rain data from that start date onward
         df = pd.read_sql(f"""
             SELECT r.timestamp::timestamptz AT TIME ZONE 'UTC' as ts, r.level,
                    COALESCE(rf.rainfall_mm, 0) as rain
             FROM readings r
             LEFT JOIN rainfall_readings rf ON rf.level_station_id = r.station_id
                                           AND rf.timestamp::timestamptz = r.timestamp::timestamptz
-            WHERE r.station_id = %s
-            ORDER BY r.timestamp DESC
-            LIMIT 500
-        """, engine, params=(sid,))
+            WHERE r.station_id = %s AND r.timestamp::timestamptz >= %s
+            ORDER BY r.timestamp
+        """, engine, params=(sid, rain_start))
 
         if df.empty or len(df) < 50:
+            print(f"Not enough data for {sid} after rainfall start")
             continue
 
         df['ts'] = pd.to_datetime(df['ts']).dt.tz_localize(None)
@@ -68,26 +81,21 @@ for river, stations in STATIONS.items():
         data = data.dropna()
 
         if len(data) < 24:
+            print(f"Insufficient feature data for {sid}")
             continue
 
         X = data.drop(columns=['level'])
-
-        # Current state (last row)
         current_features = X.iloc[-1:].copy()
 
         # Predict next 24 hours iteratively
         now = datetime.now()
         future_start = now.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
         future_times = pd.date_range(start=future_start, periods=24, freq='h')
-
         preds = []
         features = current_features.copy()
-
         for i in range(24):
             pred = model.predict(features)[0]
             preds.append(pred)
-
-            # Update features for next hour
             features = features.copy()
             features['level_lag_1'] = pred
             for lag in [3,6,12,24]:
@@ -95,7 +103,7 @@ for river, stations in STATIONS.items():
                     features[f'level_lag_{lag}'] = preds[i + 1 - lag]
             features['hour'] = future_times[i].hour
             features['dayofweek'] = future_times[i].dayofweek
-            features['rolling_6h_mean'] = features['level_lag_1'].rolling(6).mean().iloc[-1]
+            features['rolling_6h_mean'] = pd.Series(features['level_lag_1']).rolling(6).mean().iloc[-1]
 
         # Insert
         for ts, pred in zip(future_times, preds):
