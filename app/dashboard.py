@@ -64,7 +64,7 @@ with st.sidebar:
     days_options = [3, 7, 14, 21, 30, 60, 365]  # Your expanded list – feel free to adjust order
     default_days_idx = days_options.index(7)  # Sets 7 as default selection
     selected_days = st.selectbox(
-        "Graph history (days)",
+        "History (days)",
         options=days_options,
         index=default_days_idx,
         help="7 days default for mobile. Choose more for extra context."
