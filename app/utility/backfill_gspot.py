@@ -71,7 +71,7 @@ def recompute_station(station_id):
     logger.success(f"Finished {station_id} → {gspot_count} G SPOT hits")
 
 if __name__ == "__main__":
-    for sid in ["713040", "710301", "760112", "760101", "760115"]:
+    for sid in ["713040", "710301", "760112", "760101", "760115", "710151", "711610"]:
         if sid in RULES:
             recompute_station(sid)
     print("\nBackfill complete! Green dots await you.")

@@ -8,7 +8,7 @@
   },
   "710301": {
     "good_fishing": {
-      "falling_start": 1.0,
+      "falling_start": 0.8,
       "falling_end": 0.5,
       "rain_threshold": 2
     }
@@ -33,5 +33,21 @@
       "falling_end": 0.35,
       "rain_threshold": 4
     }
+  },
+  "710151": {
+    "good_fishing": {
+      "falling_start": 0.4,
+      "falling_end": 0.3,
+      "rain_threshold": 4
+    }
+  },
+    "711610": {
+    "good_fishing": {
+      "falling_start": 0.8,
+      "falling_end": 0.6,
+      "rain_threshold": 4
+    }
   }
 }
+
+

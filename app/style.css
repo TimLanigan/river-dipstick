@@ -24,21 +24,22 @@ div[data-testid="stAppViewContainer"] > .main {
 }
 
 .block-container {
-    padding-top: 1rem !important;
-    margin-top: 1rem !important;
+    padding-top: 0.5rem !important;
+    margin-top: 0.5rem !important;
 }
 
 /* River tab labels – safe targeting the tab button (text inherits safely) */
 .stTabs [data-baseweb="tab"] {
-    font-size: 2rem !important;
-    font-weight: 500 !important;
+    font-size: 1rem !important;
+    font-weight:400 !important;
 }
 
 /* Active tab underline and colour */
 .stTabs [data-baseweb="tab"][aria-selected="true"] {
+    font-size: 2rem !important;
     border-bottom: 2px solid #b44cec !important;
     color: #b44cec !important;
-    font-weight: 600 !important;        /* Slightly bolder active */
+    font-weight: 400 !important;        /* Slightly bolder active */
 }
 
 /* Space between tabs */
@@ -49,5 +50,32 @@ div[data-testid="stAppViewContainer"] > .main {
 /* Smaller station labels above each chart – targets h3 Markdown headings */
 h3 {
     font-size: 1rem !important;
-    font-weight: 500 !important;
+    font-weight: 400 !important;
+}
+/* Site title – pull it up to reduce the top gap */
+.site-title {
+    color: #b44cec !important;
+    font-weight: 600 !important;
+    font-size: 1.4rem !important;
+    text-align: left !important;
+    margin-top: -2.2rem !important;   /* Start here – adjust down to -1.5rem or -3rem as needed */
+}
+/* Unified font size and color for ALL sidebar widget labels (toggles, slider, etc.) */
+section[data-testid="stSidebar"] div[data-testid="stWidgetLabel"] p,
+section[data-testid="stSidebar"] label p,
+section[data-testid="stSidebar"] .stSelectSlider label,
+section[data-testid="stSidebar"] label {
+    font-size: 0.9rem !important;   /* Match this to what feels right – try 1.05rem if you want slightly bigger */
+    font-weight: 400 !important; /* Slightly bolder for readability on mobile */
+    color: #ffffff !important;    /* Pure white like the slider */
+}
+
+.sidebar-footer a {
+    color: #b44cec !important;
+    text-decoration: underline;
+}
+
+/* Ensure sidebar doesn't hide the button */
+section[data-testid="stSidebar"] {
+    padding-bottom: 70px !important;  /* Extra room so content doesn't scroll under button */
 }

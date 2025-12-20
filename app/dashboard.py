@@ -17,6 +17,12 @@ from datetime import datetime, timedelta, UTC
 from dotenv import load_dotenv
 import os
 from pathlib import Path
+# Load custom CSS
+def load_css():
+    with open("style.css") as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
+load_css()
 
 load_dotenv()
 DB_PASS = os.getenv("DB_PASSWORD")
@@ -40,35 +46,21 @@ load_css("style.css")
 with st.sidebar:
     st.markdown(
         """
-        <h2 style="
-            color: #b44cec;
-            font-weight: 700;
-            font-size: 1.2rem;
-            margin-top: -1.2rem;      /* ← sue me */
-            margin-bottom: 0rem;
-            text-align: left;
-        ">River Dipstick</h2>
+        <h2 class="site-title">River Dipstick</h2>
         """,
         unsafe_allow_html=True
-)
-    st.markdown("---")  # Thin divider for clarity
-    
-    show_predictions = st.toggle("Level Predictions", value=False)
-    show_sweet_spot = st.toggle("Find the G Spot", value=False)
-    show_rain = st.toggle("Rain History", value=False)
-    show_map = st.toggle("Map", value=False)    
-
-    st.markdown("")  # Small spacer
-
-    # Days selector for graphs – default 7 days (mobile-friendly)
-    days_options = [3, 7, 14, 21, 30, 60, 365]  # Your expanded list – feel free to adjust order
-    default_days_idx = days_options.index(7)  # Sets 7 as default selection
-    selected_days = st.selectbox(
-        "History (days)",
-        options=days_options,
-        index=default_days_idx,
-        help="7 days default for mobile. Choose more for extra context."
     )
+    show_sweet_spot = st.toggle("Find G Spot", value=False, help="Highlight good fishing levels, not all stations have this data")
+    show_predictions = st.toggle("Level Predict", value=False, help="Show predicted river levels (experimental)")
+    show_rain = st.toggle("Rain History", value=False, help="Show rainfall bars on the chart")
+    show_map = st.toggle("View maps", value=False, help="Show station maps")
+    st.markdown("---")
+    days_options = [7, 14, 30, 60, 180, 365]
+    selected_days = st.select_slider(
+        "Graph history (days)",
+        options=days_options,
+        value=7,  # Default value
+)
 
 # === STATIONS & RULES (only good_fishing part is used for G-spot) ===
 from river_reference import load_stations
@@ -279,13 +271,3 @@ else:
 
                 if show_map and station.get('lat') and station.get('lon'):
                     st.map(pd.DataFrame([{"lat": station['lat'], "lon": station['lon']}]), zoom=11)
-
-# === FOOTER ===
-st.markdown("""
-<div style="text-align: left; margin-top: 50px; color: #888; font-size: 0.9rem;">
-All raw data sourced from the Environment Agency API<br>
-Built with Streamlit & Prophet ML<br>
-Vibe-coded by tim<br>
-<a href="https://buymeacoffee.com/riverdipstick" target="_blank">Buy me a coffee if I helped you catch a fish</a>
-</div>
-""", unsafe_allow_html=True)
