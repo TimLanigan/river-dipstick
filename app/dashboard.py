@@ -149,31 +149,41 @@ df = get_latest_readings()
 if df.empty:
     st.write("No data yet.")
 else:
-    tabs = st.tabs(["Eden", "Ribble", "Lune", "Hodder"])
-
-    for tab, river in zip(tabs, ["Eden", "Ribble", "Lune", "Hodder"]):
+    tabs = st.tabs(["Eden", "Ribble", "Lune", "Hodder", "About"])
+    
+    for tab, river in zip(tabs, ["Eden", "Ribble", "Lune", "Hodder", "About"]):
         with tab:
+            if river == "About":
+                # === ABOUT PAGE ===
+                st.markdown("# About River Dipstick")
+                st.write("**River Dipstick** is a labour of love built by a Lancashire fly fisherman")
+                st.markdown("### Philosophy")
+                st.write("After months of real-world use, I've given up on complex machine learning predictions and fancy data science. Nothing beats the **Mark 1 Eyeball** for working out what the river level will be tomorrow. Its all part of the game.")
+                st.markdown("### Features")
+                st.write("- Real-time river levels from the Environment Agency\n- Rainfall data to help understand recent conditions\n- 'Good Fishing Level' displayed on selected charts, based on local wisdom.\n- Future space for eyeballing trends\n- Clean, fast, and mobile friendly")
+                st.markdown("### Tech")
+                st.write("Built with Streamlit • PostgreSQL • Altair • Docker")
+                st.markdown("### Feedback")
+                st.write("Suggestions from Ribblesdale Angling Society (find me in the whatsapp group, ask for Tim L) and other NW anglers are always welcome.")
+                continue
+
+            # Normal river tab content
             stations = STATIONS.get(river, [])
             stations = sorted(stations, key=lambda x: x.get('lat', 0)) if river == "Eden" else sorted(stations, key=lambda x: x.get('lat', 0), reverse=True)
             river_df = df[df['river'] == river].copy()
-
             if river_df.empty:
                 st.write("No data.")
                 continue
-          
 
-            # === FINAL TABLE (no colour coding) ===
+            # === FINAL TABLE ===
             latest = river_df.loc[river_df.groupby('station_id')['timestamp'].idxmax()]
             latest = latest.set_index('station_id').reindex([s['id'] for s in stations]).dropna(subset=['river']).reset_index()
-
             display_df = pd.DataFrame({
                 'Station': latest['label'],
                 'Level': latest['level'].round(2).astype(str) + "m",
                 'Latest Reading': latest['timestamp'].dt.strftime("%d-%m-%Y @ %H:%M"),
                 'station_id': latest['station_id']
             })
-
-            # Clean table
             st.dataframe(display_df, use_container_width=True, hide_index=True)
 
             # === CHARTS FOR EACH STATION ===
@@ -183,21 +193,14 @@ else:
                 if hist.empty:
                     st.write("No data.")
                     continue
-
                 chart_data = hist.copy()
                 legend_items = [(REAL_LABEL, "#ad36eeff")]
 
                 # === LEVEL PREDICTION ===
-                # graph 2 days into future for eyeballing
                 if show_predictions:
-                    # Extend chart into future (no prediction line)
                     if not chart_data.empty:
                         last_date = chart_data['Date'].max()
-                        future_dates = pd.date_range(
-                            start=last_date,
-                            periods=3,  # ~2 days ahead
-                            freq='D'
-                        )
+                        future_dates = pd.date_range(start=last_date, periods=3, freq='D')
                         future_df = pd.DataFrame({
                             'Date': future_dates,
                             'Level (metres)': [None] * len(future_dates),
@@ -213,59 +216,35 @@ else:
 
                 # === MAIN LEVEL LINE ===
                 level_line = alt.Chart(chart_data).mark_line(strokeWidth=4).encode(
-                    x=alt.X('Date:T', title='Date',
-                            axis=alt.Axis(format='%b %d', tickCount=14)),
+                    x=alt.X('Date:T', title='Date', axis=alt.Axis(format='%b %d', tickCount=14)),
                     y=alt.Y('Level (metres):Q', axis=alt.Axis(title='Level (m)', titleColor='white')),
-                    color=alt.Color('Type:N',
-                        scale=alt.Scale(domain=[x[0] for x in legend_items], range=[x[1] for x in legend_items]),
-                        legend=None
-                    ),
-                    strokeDash=alt.condition(
-                        alt.datum.Type == REAL_LABEL,
-                        alt.value([0]),
-                        alt.value([6,4])
-                    )
-                ).transform_filter(
-                    alt.FieldOneOfPredicate(field='Type', oneOf=[x[0] for x in legend_items if 'Rainfall' not in x[0]])
-                )
+                    color=alt.Color('Type:N', scale=alt.Scale(domain=[x[0] for x in legend_items], range=[x[1] for x in legend_items]), legend=None),
+                    strokeDash=alt.condition(alt.datum.Type == REAL_LABEL, alt.value([0]), alt.value([6,4]))
+                ).transform_filter(alt.FieldOneOfPredicate(field='Type', oneOf=[x[0] for x in legend_items if 'Rainfall' not in x[0]]))
 
-                # === GOOD FISHING BAND (New implementation - old lime dots removed) ===
+                # === GOOD FISHING BAND ===
                 if show_sweet_spot:
                     station_id = station['id']
-                    
                     if station_id in RULES and "good_min" in RULES[station_id] and "good_max" in RULES[station_id]:
                         good_min = RULES[station_id]["good_min"]
                         good_max = RULES[station_id]["good_max"]
-                        
-                        # Use full chart range (including future space)
-                        if 'chart_data' in locals() and not chart_data.empty:
-                            min_date = chart_data['Date'].min()
-                            max_date = chart_data['Date'].max()
-                        else:
-                            min_date = hist['Date'].min()
-                            max_date = hist['Date'].max()
-                        
+                        min_date = chart_data['Date'].min()
+                        max_date = chart_data['Date'].max()
                         band_data = pd.DataFrame({
                             'Date': [min_date, max_date],
                             'ymin': [good_min, good_min],
                             'ymax': [good_max, good_max]
                         })
-                        
                         good_band = alt.Chart(band_data).mark_rect(
-                            color='#34d399',      # Vibrant modern green
-                            opacity=0.50          # Lower opacity for subtlety
+                            color='#34d399', opacity=0.18
                         ).encode(
                             x=alt.X('Date:T'),
                             y=alt.Y('ymin:Q'),
                             y2=alt.Y2('ymax:Q')
                         )
-                        
-                        # Layer band under the main line
                         level_line = alt.layer(good_band, level_line)
-                        
-                        legend_items.append(("Good Fishing level", "#22c584"))
+                        legend_items.append(("Good Fishing Band", "#22c55e"))
 
-                    
                 # === RAIN BARS ===
                 rain_bars = alt.Chart(chart_data).mark_bar(opacity=0.1, size=5).encode(
                     x=alt.X('Date:T'),
@@ -291,9 +270,4 @@ else:
                     st.altair_chart(chart, use_container_width=True)
 
                 if show_map and station.get('lat') and station.get('lon'):
-                    # Higher zoom for better detail when "View maps" is toggled
-                    st.map(
-                        pd.DataFrame([{"lat": station['lat'], "lon": station['lon']}]),
-                        zoom=13,          # Increased from 11 → closer view
-                        use_container_width=True
-                    )
+                    st.map(pd.DataFrame([{"lat": station['lat'], "lon": station['lon']}]), zoom=13, use_container_width=True)
