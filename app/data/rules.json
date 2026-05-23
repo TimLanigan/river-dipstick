@@ -1,53 +1,20 @@
 {
   "760112": {
-    "good_fishing": {
-      "falling_start": 0.6,
-      "falling_end": 0.4,
-      "rain_threshold": 2
-    }
+    "station_name": "Great Musgrave Bridge",
+    "good_min": 0.29,
+    "good_max": 0.50,
+    "notes": "Good on falling limb"
   },
   "710301": {
-    "good_fishing": {
-      "falling_start": 0.8,
-      "falling_end": 0.5,
-      "rain_threshold": 2
-    }
+    "station_name": "Low Moor",
+    "good_min": 0.40,
+    "good_max": 0.80,
+    "notes": ""
   },
-  "713040": {
-    "good_fishing": {
-      "falling_start": 0.8,
-      "falling_end": 0.4,
-      "rain_threshold": 4
-    }
-  },  
-  "760115": {
-    "good_fishing": {
-      "falling_start": 0.6,
-      "falling_end": 0.35,
-      "rain_threshold": 4
-    }
-    },  
-  "760101": {
-    "good_fishing": {
-      "falling_start": 0.6,
-      "falling_end": 0.35,
-      "rain_threshold": 4
-    }
-  },
-  "710151": {
-    "good_fishing": {
-      "falling_start": 0.4,
-      "falling_end": 0.3,
-      "rain_threshold": 4
-    }
-  },
-    "711610": {
-    "good_fishing": {
-      "falling_start": 0.8,
-      "falling_end": 0.6,
-      "rain_threshold": 4
-    }
+  "711610": {
+    "station_name": "Henthorn",
+    "good_min": 0.60,
+    "good_max": 0.80,
+    "notes": ""
   }
 }
-
-

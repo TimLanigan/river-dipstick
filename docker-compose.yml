@@ -37,12 +37,23 @@ services:
       - ./app/data:/app/data
       - ./app/.streamlit:/app/.streamlit
 
-
   collector:
     build: .
     container_name: wintermute-collector
     restart: always
-    command: sh -c "mkdir -p /app/logs && while true; do echo \"=== $$(date) === Pulling EA data\"; python /app/get_readings.py >> /app/logs/get_readings.log 2>&1; echo \"=== $$(date) === Predicting future\"; python /app/level_predictor.py >> /app/logs/level_predictor.log 2>&1; echo \"=== $$(date) === Finding gspot\"; python /app/update_gspot.py >> /app/logs/gspot.log 2>&1; echo \"=== $$(date) === Finished cycle\"; echo \"Sleeping 15 minutes...\"; sleep 900; done"
+    command: sh -c "
+      mkdir -p /app/logs && 
+      while true; do 
+        echo \"=== \$(date) === Pulling EA data\"; 
+        python /app/get_readings.py >> /app/logs/get_readings.log 2>&1; 
+        
+        echo \"=== \$(date) === ML Predictor disabled (using Mk1 eyeball)\";
+        echo \"=== \$(date) === G-Spot updater disabled (static green band in use)\";
+        
+        echo \"=== \$(date) === Finished cycle\"; 
+        echo \"Sleeping 15 minutes...\"; 
+        sleep 900; 
+      done"
     depends_on:
       db:
         condition: service_healthy

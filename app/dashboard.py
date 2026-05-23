@@ -42,7 +42,7 @@ st.set_page_config(
 
 load_css("style.css")
 
-# Clean sidebar title
+# === SIDEBAR WITH CLEAR LABEL ===
 with st.sidebar:
     st.markdown(
         """
@@ -50,19 +50,21 @@ with st.sidebar:
         """,
         unsafe_allow_html=True
     )
-    show_sweet_spot = st.toggle("Find G Spot", value=False, help="Highlight good fishing levels, not all stations have this data")
-    show_predictions = st.toggle("Level Predict", value=False, help="Show predicted river levels (experimental)")
-    show_rain = st.toggle("Rain History", value=False, help="Show rainfall bars on the chart")
-    show_map = st.toggle("View maps", value=False, help="Show station maps")
+    
+    show_sweet_spot = st.toggle("Find G Spot", value=False, help="Highlight good fishing levels at key stations")
+    show_predictions = st.toggle("Predict Level", value=False, help="Use Mk1 eyeball to predict level")
+    show_rain = st.toggle("Rain History", value=False, help="Show historic rainfall on the chart")
+    show_map = st.toggle("View maps", value=False, help="Show measuring station")
+    
     st.markdown("---")
     days_options = [7, 14, 30, 60, 180, 365]
     selected_days = st.select_slider(
         "Graph history (days)",
         options=days_options,
-        value=7,  # Default value
-)
+        value=7,
+    )
 
-# === STATIONS & RULES (only good_fishing part is used for G-spot) ===
+# === STATIONS & RULES ===
 from river_reference import load_stations
 STATIONS = load_stations()
 
@@ -158,8 +160,9 @@ else:
             if river_df.empty:
                 st.write("No data.")
                 continue
+          
 
-            # === FINAL TABLE (no colour coding any more) ===
+            # === FINAL TABLE (no colour coding) ===
             latest = river_df.loc[river_df.groupby('station_id')['timestamp'].idxmax()]
             latest = latest.set_index('station_id').reindex([s['id'] for s in stations]).dropna(subset=['river']).reset_index()
 
@@ -184,17 +187,23 @@ else:
                 chart_data = hist.copy()
                 legend_items = [(REAL_LABEL, "#ad36eeff")]
 
-                # Predictions
+                # === LEVEL PREDICTION ===
+                # graph 2 days into future for eyeballing
                 if show_predictions:
-                    pred = get_predictions(station['id'])
-                    if not pred.empty:
-                        now = datetime.now(UTC)
-                        past = pred[pred['Date'] < now].copy()
-                        past['Type'] = 'Past Performance'
-                        future = pred[pred['Date'] >= now].copy()
-                        future['Type'] = 'Future Prediction'
-                        chart_data = pd.concat([chart_data, past, future], ignore_index=True)
-                        legend_items += [("Past Performance", "#888888"), ("Future Prediction", "#BB22BB")]
+                    # Extend chart into future (no prediction line)
+                    if not chart_data.empty:
+                        last_date = chart_data['Date'].max()
+                        future_dates = pd.date_range(
+                            start=last_date,
+                            periods=3,  # ~2 days ahead
+                            freq='D'
+                        )
+                        future_df = pd.DataFrame({
+                            'Date': future_dates,
+                            'Level (metres)': [None] * len(future_dates),
+                            'Type': ['Measured Level'] * len(future_dates)
+                        })
+                        chart_data = pd.concat([chart_data, future_df], ignore_index=True)
 
                 # Rain
                 rain_df = get_rainfall_data(station['id'])
@@ -220,31 +229,43 @@ else:
                     alt.FieldOneOfPredicate(field='Type', oneOf=[x[0] for x in legend_items if 'Rainfall' not in x[0]])
                 )
 
-                # === G SPOT (completely untouched) ===
+                # === GOOD FISHING BAND (New implementation - old lime dots removed) ===
                 if show_sweet_spot:
-                    gspot_rows = hist[hist.get('good_level') == 'y'].copy()
-                    if not gspot_rows.empty:
-                        gspot_dots = alt.Chart(gspot_rows).mark_circle(
-                            size=10,
-                            color='lime',
-                            opacity=1,
-                            stroke='lime',
-                            strokeWidth=2
+                    station_id = station['id']
+                    
+                    if station_id in RULES and "good_min" in RULES[station_id] and "good_max" in RULES[station_id]:
+                        good_min = RULES[station_id]["good_min"]
+                        good_max = RULES[station_id]["good_max"]
+                        
+                        # Use full chart range (including future space)
+                        if 'chart_data' in locals() and not chart_data.empty:
+                            min_date = chart_data['Date'].min()
+                            max_date = chart_data['Date'].max()
+                        else:
+                            min_date = hist['Date'].min()
+                            max_date = hist['Date'].max()
+                        
+                        band_data = pd.DataFrame({
+                            'Date': [min_date, max_date],
+                            'ymin': [good_min, good_min],
+                            'ymax': [good_max, good_max]
+                        })
+                        
+                        good_band = alt.Chart(band_data).mark_rect(
+                            color='#34d399',      # Vibrant modern green
+                            opacity=0.50          # Lower opacity for subtlety
                         ).encode(
-                            x='Date:T',
-                            y=alt.Y('Level (metres):Q', title='Level (m)'),
-                            tooltip=['Date:T', 'Level (metres):Q']
+                            x=alt.X('Date:T'),
+                            y=alt.Y('ymin:Q'),
+                            y2=alt.Y2('ymax:Q')
                         )
-                        level_line = level_line + gspot_dots
-                        legend_items.append(("Good Level", "lime"))
+                        
+                        # Layer band under the main line
+                        level_line = alt.layer(good_band, level_line)
+                        
+                        legend_items.append(("Good Fishing level", "#22c584"))
 
-                    if not hist.empty and hist.iloc[-1].get('good_level') == 'y':
-                        st.markdown("""
-                        <h4 style="color:limegreen; text-align:right; font-size:0.8rem;">
-                        G Spot found, go fishing!!!
-                        </h4>
-                        """, unsafe_allow_html=True)
-
+                    
                 # === RAIN BARS ===
                 rain_bars = alt.Chart(chart_data).mark_bar(opacity=0.1, size=5).encode(
                     x=alt.X('Date:T'),
@@ -270,4 +291,9 @@ else:
                     st.altair_chart(chart, use_container_width=True)
 
                 if show_map and station.get('lat') and station.get('lon'):
-                    st.map(pd.DataFrame([{"lat": station['lat'], "lon": station['lon']}]), zoom=11)
+                    # Higher zoom for better detail when "View maps" is toggled
+                    st.map(
+                        pd.DataFrame([{"lat": station['lat'], "lon": station['lon']}]),
+                        zoom=13,          # Increased from 11 → closer view
+                        use_container_width=True
+                    )
