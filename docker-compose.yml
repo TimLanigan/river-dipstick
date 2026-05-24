@@ -41,19 +41,7 @@ services:
     build: .
     container_name: wintermute-collector
     restart: always
-    command: sh -c "
-      mkdir -p /app/logs && 
-      while true; do 
-        echo \"=== \$(date) === Pulling EA data\"; 
-        python /app/get_readings.py >> /app/logs/get_readings.log 2>&1; 
-        
-        echo \"=== \$(date) === ML Predictor disabled (using Mk1 eyeball)\";
-        echo \"=== \$(date) === G-Spot updater disabled (static green band in use)\";
-        
-        echo \"=== \$(date) === Finished cycle\"; 
-        echo \"Sleeping 15 minutes...\"; 
-        sleep 900; 
-      done"
+    command: sh -c "mkdir -p /app/logs && while true; do echo \"=== \$(date) === Pulling EA + SEPA data\"; python /app/get_readings.py >> /app/logs/get_readings.log 2>&1; echo \"=== \$(date) === Finished cycle\"; echo \"Sleeping 15 minutes...\"; sleep 900; done"
     depends_on:
       db:
         condition: service_healthy

@@ -12,9 +12,27 @@
     "notes": ""
   },
   "711610": {
-    "station_name": "Henthorn",
-    "good_min": 0.60,
-    "good_max": 0.80,
+    "station_name": "Hodderplace",
+    "good_min": 0.40,
+    "good_max": 0.60,
     "notes": ""
+  },
+  "133148": {
+    "station_name": "Canonbie",
+    "good_min": 0.25,
+    "good_max": 0.4,
+    "notes": "Placeholder - adjust based on local knowledge"
+  },
+  "133170": {
+    "station_name": "Newcastleton",
+    "good_min": 0.12,
+    "good_max": 0.18,
+    "notes": "Placeholder - adjust based on local knowledge"
+  },
+  "713040": {
+    "station_name": "Ribchester School",
+    "good_min": 0.20,
+    "good_max": 0.50,
+    "notes": "Placeholder - adjust based on local knowledge"
   }
 }

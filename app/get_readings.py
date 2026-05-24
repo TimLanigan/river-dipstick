@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """
 get_readings.py - 15-min collection
-Optimized: Fresh data check + 2-day gap backfill + retry + logging
+Supports both EA and SEPA stations
 """
-
 import requests
 import psycopg2
 from datetime import datetime, timedelta, UTC
@@ -12,6 +11,7 @@ from loguru import logger
 from river_reference import STATIONS
 from dotenv import load_dotenv
 import os
+
 load_dotenv()
 DB_PASS = os.getenv("DB_PASSWORD")
 CONNECTION_STRING = f'postgresql://river_user:{DB_PASS}@db/river_levels_db'
@@ -47,12 +47,12 @@ def init_db():
     conn.close()
 
 # --------------------------------------------------------------------------- #
-# API WITH RETRY
+# API HELPERS
 # --------------------------------------------------------------------------- #
-def api_get(url, params=None):
+def api_get(url, params=None, timeout=10):
     for attempt in range(3):
         try:
-            resp = requests.get(url, params=params, timeout=10)
+            resp = requests.get(url, params=params, timeout=timeout)
             resp.raise_for_status()
             return resp.json()
         except requests.RequestException as e:
@@ -60,24 +60,51 @@ def api_get(url, params=None):
             time.sleep(5)
     return None
 
-# --------------------------------------------------------------------------- #
-# LEVELS
-# --------------------------------------------------------------------------- #
-def get_latest_river_level(station_id):
+# EA (Environment Agency)
+def get_ea_latest_level(station_id):
     url = f"https://environment.data.gov.uk/flood-monitoring/id/stations/{station_id}/readings"
-    data = api_get(url, params={"latest": "", "parameter": "level"})
+    data = api_get(url, {"latest": "", "parameter": "level"})
     if data and 'items' in data and data['items']:
         item = data['items'][0]
-        return item['value'], item['dateTime']
+        return item.get('value'), item.get('dateTime')
     return None, None
 
-def fetch_missing_readings(station_id, since_date):
-    url = f"https://environment.data.gov.uk/flood-monitoring/id/stations/{station_id}/readings"
-    data = api_get(url, params={"parameter": "level", "since": since_date, "_sorted": ""})
-    if data and 'items' in data:
-        return [(item['value'], item['dateTime']) for item in data['items']]
-    return []
+# SEPA (KiWIS API)
+def get_sepa_latest_level(station_id):
+    url = "https://timeseries.sepa.org.uk/KiWIS/KiWIS"
+    params = {
+        "service": "kisters",
+        "type": "queryServices",
+        "datasource": "0",
+        "request": "getTimeseriesValues",
+        "ts_path": f"1/{station_id}/SG/15m.Cmd",
+        "period": "P1D",
+        "format": "json"
+    }
+    data = api_get(url, params)
+    
+    if not data or not isinstance(data, list) or len(data) == 0:
+        logger.warning(f"SEPA returned no data for station {station_id}")
+        return None, None
 
+    try:
+        for item in data:
+            if isinstance(item, dict) and 'data' in item and isinstance(item['data'], list) and len(item['data']) > 0:
+                latest_entry = item['data'][-1]
+                if len(latest_entry) >= 2:
+                    ts = latest_entry[0]
+                    value = float(latest_entry[1])
+                    logger.info(f"SEPA success for {station_id}: {value:.3f}m at {ts}")
+                    return value, ts
+    except (IndexError, ValueError, TypeError, KeyError) as e:
+        logger.warning(f"SEPA parsing error for {station_id}: {e}")
+
+    logger.warning(f"Could not extract value from SEPA response for {station_id}")
+    return None, None
+
+# --------------------------------------------------------------------------- #
+# INSERT FUNCTIONS
+# --------------------------------------------------------------------------- #
 def insert_reading(station_id, river, label, level, timestamp):
     conn = psycopg2.connect(CONNECTION_STRING)
     cursor = conn.cursor()
@@ -95,24 +122,6 @@ def insert_reading(station_id, river, label, level, timestamp):
     finally:
         conn.close()
 
-# --------------------------------------------------------------------------- #
-# RAINFALL
-# --------------------------------------------------------------------------- #
-def get_latest_rainfall(rainfall_id):
-    url = f"https://environment.data.gov.uk/flood-monitoring/id/stations/{rainfall_id}/readings"
-    data = api_get(url, params={"latest": "", "parameter": "rainfall"})
-    if data and 'items' in data and data['items']:
-        item = data['items'][0]
-        return item['value'], item['dateTime']
-    return None, None
-
-def fetch_missing_rainfall(rainfall_id, since_date):
-    url = f"https://environment.data.gov.uk/flood-monitoring/id/stations/{rainfall_id}/readings"
-    data = api_get(url, params={"parameter": "rainfall", "since": since_date, "_sorted": ""})
-    if data and 'items' in data:
-        return [(item['value'], item['dateTime']) for item in data['items']]
-    return []
-
 def insert_rainfall(level_station_id, rainfall_station_id, rainfall_mm, timestamp):
     conn = psycopg2.connect(CONNECTION_STRING)
     cursor = conn.cursor()
@@ -123,17 +132,7 @@ def insert_rainfall(level_station_id, rainfall_station_id, rainfall_mm, timestam
             ON CONFLICT (level_station_id, timestamp) DO NOTHING
         ''', (level_station_id, rainfall_station_id, rainfall_mm, timestamp))
         if cursor.rowcount:
-            logger.info(f"Inserted rainfall {rainfall_mm}mm for {level_station_id} from {rainfall_station_id}")
-        conn.commit()
-    except psycopg2.errors.UndefinedObject:
-        # Fallback if constraint missing
-        cursor.execute('''
-            INSERT INTO rainfall_readings (level_station_id, rainfall_station_id, rainfall_mm, timestamp)
-            VALUES (%s, %s, %s, %s)
-            ON CONFLICT DO NOTHING
-        ''', (level_station_id, rainfall_station_id, rainfall_mm, timestamp))
-        if cursor.rowcount:
-            logger.info(f"Inserted rainfall {rainfall_mm}mm for {level_station_id} (fallback)")
+            logger.info(f"Inserted rainfall {rainfall_mm}mm for {level_station_id}")
         conn.commit()
     except Exception as e:
         logger.error(f"DB insert error: {e}")
@@ -141,52 +140,40 @@ def insert_rainfall(level_station_id, rainfall_station_id, rainfall_mm, timestam
         conn.close()
 
 # --------------------------------------------------------------------------- #
-# GAPS (2 DAYS)
-# --------------------------------------------------------------------------- #
-def has_gaps(station_id, days=7):
-    conn = psycopg2.connect(CONNECTION_STRING)
-    cursor = conn.cursor()
-    since = (datetime.now(UTC) - timedelta(hours=24)).replace(microsecond=0).isoformat()
-    cursor.execute("SELECT COUNT(*) FROM readings WHERE station_id = %s AND timestamp >= %s", (station_id, since))
-    count = cursor.fetchone()[0]
-    expected = days * 96  # 15-min
-    conn.close()
-    return count < expected * 0.9
-
-# --------------------------------------------------------------------------- #
 # MAIN
 # --------------------------------------------------------------------------- #
 if __name__ == "__main__":
     init_db()
-    logger.info("Starting 15-min collection")
+    logger.info("=== Starting 15-min collection (EA + SEPA) ===")
+    logger.info(f"Loaded {len(STATIONS)} rivers from reference")
+
+    # Explicit list of SEPA stations
+    SEPA_STATIONS = {"133148", "133170", "133176", "506155"}
 
     for river, stations in STATIONS.items():
+        logger.info(f"Processing river: {river} ({len(stations)} stations)")
         for station in stations:
             sid = station['id']
             label = station['label']
-            rain_id = station.get('rainfall_id')
+            river_name = river
 
-            # Level
-            level, ts = get_latest_river_level(sid)
+            logger.info(f" → Fetching {label} ({sid})")
+
+            if sid in SEPA_STATIONS:
+                logger.info(f"    Using SEPA API for {sid}")
+                level, ts = get_sepa_latest_level(sid)
+                source = "SEPA"
+            else:
+                logger.info(f"    Using EA API for {sid}")
+                level, ts = get_ea_latest_level(sid)
+                source = "EA"
+
             if level is not None:
-                insert_reading(sid, river, label, level, ts)
-
-            # Rainfall
-            if rain_id:
-                rain, rts = get_latest_rainfall(rain_id)
-                if rain is not None:
-                    insert_rainfall(sid, rain_id, rain, rts or ts)
-
-            # Gap backfill (2 days)
-            if has_gaps(sid):
-                logger.warning(f"Gaps in {sid} — backfilling 2 days")
-                since = (datetime.now(UTC) - timedelta(days=2)).strftime('%Y-%m-%dT%H:%M:%SZ')
-                for l, t in fetch_missing_readings(sid, since):
-                    insert_reading(sid, river, label, l, t)
-                if rain_id:
-                    for r, t in fetch_missing_rainfall(rain_id, since):
-                        insert_rainfall(sid, rain_id, r, t)
+                logger.info(f"    SUCCESS: {label} = {level:.3f}m")
+                insert_reading(sid, river_name, label, level, ts)
+            else:
+                logger.warning(f"    NO DATA for {label} ({sid}) from {source}")
 
             time.sleep(1)
 
-    logger.info("Collection complete")
+    logger.info("=== Collection complete ===")

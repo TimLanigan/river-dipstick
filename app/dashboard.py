@@ -90,15 +90,17 @@ def get_latest_readings():
     df['timestamp'] = pd.to_datetime(df['timestamp'])
     return df
 
-def get_historical_data(station_id, days=selected_days):
+def get_historical_data(station_id, days=7):
     conn = psycopg2.connect(CONNECTION_STRING)
     start = (datetime.now(UTC) - timedelta(days=days)).isoformat()
     df = pd.read_sql_query("""
-        SELECT timestamp, level, good_level FROM readings
+        SELECT timestamp, level 
+        FROM readings
         WHERE station_id = %s AND timestamp >= %s
         ORDER BY timestamp
     """, conn, params=(station_id, start))
     conn.close()
+    
     if not df.empty:
         df['timestamp'] = pd.to_datetime(df['timestamp'])
         df = df.rename(columns={'timestamp': 'Date', 'level': 'Level (metres)'})
@@ -149,30 +151,38 @@ df = get_latest_readings()
 if df.empty:
     st.write("No data yet.")
 else:
-    tabs = st.tabs(["Eden", "Ribble", "Lune", "Hodder", "About"])
+    # Get all rivers dynamically and sort alphabetically
+    all_rivers = sorted(STATIONS.keys())
+    tab_list = all_rivers + ["About"]
     
-    for tab, river in zip(tabs, ["Eden", "Ribble", "Lune", "Hodder", "About"]):
+    tabs = st.tabs(tab_list)
+    
+    for tab, river in zip(tabs, tab_list):
         with tab:
             if river == "About":
                 # === ABOUT PAGE ===
-                st.write("**River Dipstick** is built by a Lancashire fly fisherman primarly for himself and other local anglers. It provides real-time river level data for the Eden, Ribble, Lune and Hodder with data sourced from the Environment Agency's public API. The app is designed to be simple and intuitive, with a focus on providing the most relevant information at a glance. And no ads or annoying pop-ups. Rejoice!")
+                st.write("The **River Dipstick** is built by a Lancashire fly fisherman primarly for himself and other local legends.")
+                st.write("All data is sourced from the EA and SEPA public API's.")
                 st.markdown("### Features")
-                st.write("- Access the sidebar by selecting the menu >> in the top lefthand corner of the site\n- Select 'Find G Spot' to highlight good fishing levels on selected charts, based on local wisdom.\n- Select 'Predict Level' for space to eyeball trends\n- Select 'Rainfall History' to view recent rainfall data\n- Select 'Maps' to see where the measuring station is located\n- Use the 'Graph History' slider to show more or less data on the charts\n- **Don't spend too long looking at data, remember to go fishing** 😊")
+                st.write("- Access the sidebar by selecting the menu >> in the top lefthand corner of the site\n- Select 'Find G Spot' to highlight good fishing levels on selected charts, based on local wisdom (where it exists)\n- When viewing the 'Good Fishing Band' on a chart; remember... a falling river is always best\n- Select 'Predict Level' for space to eyeball trends\n- Select 'Rainfall History' to view recent rainfall data\n- Select 'Maps' to see where the measuring station is located\n- Use the 'Graph History' slider to show more or less data on the charts\n- **Don't spend too long looking at data, if in doubt... go fishing** 😊")
                 st.markdown("### Tech")
-                st.write("100% Open Source, built with Streamlit • PostgreSQL • Altair • Docker")
+                st.write("100% open source - [https://github.com/TimLanigan/river-dipstick]")
+                st.write("Built with Streamlit • PostgreSQL • Altair • Docker")
                 st.markdown("### Feedback")
                 st.write("Coming Soon")
                 continue
 
-            # Normal river tab content
+            # === NORMAL RIVER TAB ===
             stations = STATIONS.get(river, [])
-            stations = sorted(stations, key=lambda x: x.get('lat', 0)) if river == "Eden" else sorted(stations, key=lambda x: x.get('lat', 0), reverse=True)
+            # Sort stations by latitude (north to south or vice versa)
+            stations = sorted(stations, key=lambda x: x.get('lat', 0), reverse=True)
+            
             river_df = df[df['river'] == river].copy()
             if river_df.empty:
                 st.write("No data.")
                 continue
 
-            # === FINAL TABLE ===
+            # Table + Charts code (your existing code)
             latest = river_df.loc[river_df.groupby('station_id')['timestamp'].idxmax()]
             latest = latest.set_index('station_id').reindex([s['id'] for s in stations]).dropna(subset=['river']).reset_index()
             display_df = pd.DataFrame({
@@ -240,7 +250,7 @@ else:
                             y2=alt.Y2('ymax:Q')
                         )
                         level_line = alt.layer(good_band, level_line)
-                        legend_items.append(("Good Fishing on a falling river", "#22c55e"))
+                        legend_items.append(("Good Fishing", "#22c55e"))
 
                 # === RAIN BARS ===
                 rain_bars = alt.Chart(chart_data).mark_bar(opacity=0.1, size=5).encode(
