@@ -155,16 +155,13 @@ else:
         with tab:
             if river == "About":
                 # === ABOUT PAGE ===
-                st.markdown("# About River Dipstick")
-                st.write("**River Dipstick** is a labour of love built by a Lancashire fly fisherman")
-                st.markdown("### Philosophy")
-                st.write("After months of real-world use, I've given up on complex machine learning predictions and fancy data science. Nothing beats the **Mark 1 Eyeball** for working out what the river level will be tomorrow. Its all part of the game.")
+                st.write("**River Dipstick** is built by a Lancashire fly fisherman primarly for himself and other local anglers. It provides real-time river level data for the Eden, Ribble, Lune and Hodder with data sourced from the Environment Agency's public API. The app is designed to be simple and intuitive, with a focus on providing the most relevant information at a glance. And no ads or annoying pop-ups. Rejoice!")
                 st.markdown("### Features")
-                st.write("- Real-time river levels from the Environment Agency\n- Rainfall data to help understand recent conditions\n- 'Good Fishing Level' displayed on selected charts, based on local wisdom.\n- Future space for eyeballing trends\n- Clean, fast, and mobile friendly")
+                st.write("- Access the sidebar by selecting the menu >> in the top lefthand corner of the site\n- Select 'Find G Spot' to highlight good fishing levels on selected charts, based on local wisdom.\n- Select 'Predict Level' for space to eyeball trends\n- Select 'Rainfall History' to view recent rainfall data\n- Select 'Maps' to see where the measuring station is located\n- Use the 'Graph History' slider to show more or less data on the charts\n- **Don't spend too long looking at data, remember to go fishing** 😊")
                 st.markdown("### Tech")
-                st.write("Built with Streamlit • PostgreSQL • Altair • Docker")
+                st.write("100% Open Source, built with Streamlit • PostgreSQL • Altair • Docker")
                 st.markdown("### Feedback")
-                st.write("Suggestions from Ribblesdale Angling Society (find me in the whatsapp group, ask for Tim L) and other NW anglers are always welcome.")
+                st.write("Coming Soon")
                 continue
 
             # Normal river tab content
@@ -243,7 +240,7 @@ else:
                             y2=alt.Y2('ymax:Q')
                         )
                         level_line = alt.layer(good_band, level_line)
-                        legend_items.append(("Good Fishing Band", "#22c55e"))
+                        legend_items.append(("Good Fishing on a falling river", "#22c55e"))
 
                 # === RAIN BARS ===
                 rain_bars = alt.Chart(chart_data).mark_bar(opacity=0.1, size=5).encode(
