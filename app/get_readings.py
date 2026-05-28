@@ -60,7 +60,7 @@ def api_get(url, params=None, timeout=10):
             time.sleep(5)
     return None
 
-# EA (Environment Agency)
+# EA Level
 def get_ea_latest_level(station_id):
     url = f"https://environment.data.gov.uk/flood-monitoring/id/stations/{station_id}/readings"
     data = api_get(url, {"latest": "", "parameter": "level"})
@@ -69,7 +69,16 @@ def get_ea_latest_level(station_id):
         return item.get('value'), item.get('dateTime')
     return None, None
 
-# SEPA (KiWIS API)
+# EA Rainfall - Critical for original stations
+def get_ea_latest_rainfall(station_id):
+    url = f"https://environment.data.gov.uk/flood-monitoring/id/stations/{station_id}/readings"
+    data = api_get(url, {"latest": "", "parameter": "rainfall"})
+    if data and 'items' in data and data['items']:
+        item = data['items'][0]
+        return item.get('value'), item.get('dateTime')
+    return None, None
+
+# SEPA Level
 def get_sepa_latest_level(station_id):
     url = "https://timeseries.sepa.org.uk/KiWIS/KiWIS"
     params = {
@@ -82,11 +91,9 @@ def get_sepa_latest_level(station_id):
         "format": "json"
     }
     data = api_get(url, params)
-    
     if not data or not isinstance(data, list) or len(data) == 0:
         logger.warning(f"SEPA returned no data for station {station_id}")
         return None, None
-
     try:
         for item in data:
             if isinstance(item, dict) and 'data' in item and isinstance(item['data'], list) and len(item['data']) > 0:
@@ -98,7 +105,6 @@ def get_sepa_latest_level(station_id):
                     return value, ts
     except (IndexError, ValueError, TypeError, KeyError) as e:
         logger.warning(f"SEPA parsing error for {station_id}: {e}")
-
     logger.warning(f"Could not extract value from SEPA response for {station_id}")
     return None, None
 
@@ -147,7 +153,7 @@ if __name__ == "__main__":
     logger.info("=== Starting 15-min collection (EA + SEPA) ===")
     logger.info(f"Loaded {len(STATIONS)} rivers from reference")
 
-    # Explicit list of SEPA stations
+    # Explicit list of SEPA stations (no rainfall available)
     SEPA_STATIONS = {"133148", "133170", "133176", "506155"}
 
     for river, stations in STATIONS.items():
@@ -156,23 +162,34 @@ if __name__ == "__main__":
             sid = station['id']
             label = station['label']
             river_name = river
+            rainfall_id = station.get("rainfall_id")
 
             logger.info(f" → Fetching {label} ({sid})")
 
             if sid in SEPA_STATIONS:
-                logger.info(f"    Using SEPA API for {sid}")
+                logger.info(f" Using SEPA API for {sid}")
                 level, ts = get_sepa_latest_level(sid)
                 source = "SEPA"
             else:
-                logger.info(f"    Using EA API for {sid}")
+                logger.info(f" Using EA API for {sid}")
                 level, ts = get_ea_latest_level(sid)
                 source = "EA"
 
             if level is not None:
-                logger.info(f"    SUCCESS: {label} = {level:.3f}m")
+                logger.info(f" SUCCESS: {label} = {level:.3f}m")
                 insert_reading(sid, river_name, label, level, ts)
+
+                # Rainfall collection - only for original EA stations
+                if rainfall_id and sid not in SEPA_STATIONS:
+                    rain_value, rain_ts = get_ea_latest_rainfall(rainfall_id)
+                    if rain_value is not None:
+                        insert_rainfall(sid, rainfall_id, rain_value, rain_ts)
+                    else:
+                        logger.warning(f" No rainfall data for {label} ({rainfall_id})")
+                elif sid in SEPA_STATIONS:
+                    logger.info(f" Skipping rainfall (not available) for {label} ({sid})")
             else:
-                logger.warning(f"    NO DATA for {label} ({sid}) from {source}")
+                logger.warning(f" NO DATA for {label} ({sid}) from {source}")
 
             time.sleep(1)
 

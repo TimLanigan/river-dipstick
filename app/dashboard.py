@@ -14,6 +14,7 @@ import time
 import json
 import altair as alt
 from datetime import datetime, timedelta, UTC
+import pytz
 from dotenv import load_dotenv
 import os
 from pathlib import Path
@@ -32,6 +33,15 @@ REAL_LABEL = "Measured Level"
 def load_css(file_path):
     with open(file_path) as f:
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
+# UK Timezone helper (handles BST <-> GMT automatically)
+def to_uk_time(utc_dt):
+    uk_tz = pytz.timezone('Europe/London')
+    if isinstance(utc_dt, str):
+        utc_dt = pd.to_datetime(utc_dt)
+    if utc_dt.tzinfo is None:
+        utc_dt = utc_dt.tz_localize('UTC')
+    return utc_dt.tz_convert(uk_tz)
 
 st.set_page_config(
     layout="wide",
@@ -103,6 +113,7 @@ def get_historical_data(station_id, days=7):
     
     if not df.empty:
         df['timestamp'] = pd.to_datetime(df['timestamp'])
+        df['timestamp'] = df['timestamp'].apply(to_uk_time)
         df = df.rename(columns={'timestamp': 'Date', 'level': 'Level (metres)'})
         df['Type'] = REAL_LABEL
     return df
@@ -118,6 +129,7 @@ def get_predictions(station_id, days=selected_days):
     conn.close()
     if not df.empty:
         df['predicted_for'] = pd.to_datetime(df['predicted_for'])
+        df['predicted_for'] = df['predicted_for'].apply(to_uk_time)
         df = df.rename(columns={'predicted_for': 'Date', 'predicted_level': 'Level (metres)'})
         df['Type'] = 'Predicted'
     return df
@@ -185,21 +197,29 @@ else:
             # Table + Charts code (your existing code)
             latest = river_df.loc[river_df.groupby('station_id')['timestamp'].idxmax()]
             latest = latest.set_index('station_id').reindex([s['id'] for s in stations]).dropna(subset=['river']).reset_index()
+            # Convert to UK time for display
+            latest_display = latest.copy()
+            latest_display['timestamp'] = latest_display['timestamp'].apply(to_uk_time)
+            
             display_df = pd.DataFrame({
-                'Station': latest['label'],
-                'Level': latest['level'].round(2).astype(str) + "m",
-                'Latest Reading': latest['timestamp'].dt.strftime("%d-%m-%Y @ %H:%M"),
-                'station_id': latest['station_id']
+                'Station': latest_display['label'],
+                'Level': latest_display['level'].round(2).astype(str) + "m",
+                'Latest Reading': latest_display['timestamp'].dt.strftime("%d-%m-%Y @ %H:%M"),
+                'station_id': latest_display['station_id']
             })
             st.dataframe(display_df, use_container_width=True, hide_index=True)
 
             # === CHARTS FOR EACH STATION ===
             for station in stations:
                 st.write(f"### {station['label']}")
-                hist = get_historical_data(station['id'])
+                hist = get_historical_data(station['id'], days=selected_days)
                 if hist.empty:
                     st.write("No data.")
                     continue
+                # Optional: inform user
+                actual_days = (hist['Date'].max() - hist['Date'].min()).days if not hist.empty else 0
+                if actual_days < selected_days - 1:
+                    st.caption(f"Showing all available data ({actual_days} days). This station is relatively new.")
                 chart_data = hist.copy()
                 legend_items = [(REAL_LABEL, "#ad36eeff")]
 
@@ -216,7 +236,7 @@ else:
                         chart_data = pd.concat([chart_data, future_df], ignore_index=True)
 
                 # Rain
-                rain_df = get_rainfall_data(station['id'])
+                rain_df = get_rainfall_data(station['id'], days=selected_days)
                 if show_rain and not rain_df.empty:
                     chart_data = pd.concat([chart_data, rain_df], ignore_index=True)
                     legend_items.append((" Rainfall", "lightblue"))
@@ -226,7 +246,11 @@ else:
                     x=alt.X('Date:T', title='Date', axis=alt.Axis(format='%b %d', tickCount=14)),
                     y=alt.Y('Level (metres):Q', axis=alt.Axis(title='Level (m)', titleColor='white')),
                     color=alt.Color('Type:N', scale=alt.Scale(domain=[x[0] for x in legend_items], range=[x[1] for x in legend_items]), legend=None),
-                    strokeDash=alt.condition(alt.datum.Type == REAL_LABEL, alt.value([0]), alt.value([6,4]))
+                    strokeDash=alt.condition(alt.datum.Type == REAL_LABEL, alt.value([0]), alt.value([6,4])),
+                    tooltip=[
+                        alt.Tooltip('Date:T', title='Date', format='%d-%m-%Y @ %H:%M'),
+                        alt.Tooltip('Level (metres):Q', title='Level (metres)', format='.3f')
+                    ]
                 ).transform_filter(alt.FieldOneOfPredicate(field='Type', oneOf=[x[0] for x in legend_items if 'Rainfall' not in x[0]]))
 
                 # === GOOD FISHING BAND ===
