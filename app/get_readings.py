@@ -43,6 +43,15 @@ def init_db():
             UNIQUE(level_station_id, timestamp)
         )
     ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS pressure_forecasts (
+            river TEXT NOT NULL,
+            forecast_date TIMESTAMP NOT NULL,
+            pressure_hpa REAL NOT NULL,
+            is_forecast BOOLEAN DEFAULT FALSE,
+            UNIQUE(river, forecast_date)
+        )
+    ''')
     conn.commit()
     conn.close()
 

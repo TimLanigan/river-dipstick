@@ -39,11 +39,26 @@ def to_uk_time(utc_dt):
         utc_dt = utc_dt.tz_localize('UTC')
     return utc_dt.tz_convert(uk_tz)
 
+# === CUSTOM FAVICON SETUP ===
+# Drop your new favicon as: app/static/favicon.png
+# We set page_icon + inject <link> tags for maximum compatibility
+# (tabs + bookmarks often need both).
+FAVICON_PATH = "static/favicon.png"
+page_icon = FAVICON_PATH if os.path.exists(FAVICON_PATH) else None
+
 st.set_page_config(
     layout="wide",
     page_title="River Dipstick",
-    page_icon="🎣",
+    page_icon=page_icon,
     initial_sidebar_state="collapsed"
+)
+
+st.markdown(
+    f"""
+    <link rel="icon" type="image/png" href="{FAVICON_PATH}">
+    <link rel="shortcut icon" href="{FAVICON_PATH}">
+    """,
+    unsafe_allow_html=True
 )
 
 load_css("style.css")
@@ -119,11 +134,11 @@ def get_rainfall_data(station_id, days=selected_days):
     return df
 
 def get_pressure_data(river, days=selected_days):
-    """Fetch historic + forecast pressure for a river"""
+    """Fetch historic + forecast pressure for a river (for dual-axis overlay)"""
     conn = psycopg2.connect(CONNECTION_STRING)
     start = (datetime.now(UTC) - timedelta(days=days)).isoformat()
     df = pd.read_sql_query("""
-        SELECT forecast_date as Date, pressure_hpa as Pressure
+        SELECT forecast_date, pressure_hpa
         FROM pressure_forecasts
         WHERE river = %s AND forecast_date >= %s
         ORDER BY forecast_date
@@ -131,10 +146,21 @@ def get_pressure_data(river, days=selected_days):
     conn.close()
     
     if df.empty:
-        return pd.DataFrame(columns=['date', 'Pressure', 'Type'])
+        return pd.DataFrame(columns=['Date', 'Pressure', 'Type'])
     
     df = df.copy()
-    df['Date'] = pd.to_datetime(df['date']).apply(to_uk_time)
+    df = df.rename(columns={'forecast_date': 'Date', 'pressure_hpa': 'Pressure'})
+    df['Date'] = pd.to_datetime(df['Date']).apply(to_uk_time)
+
+    # Resample to hourly for a smooth continuous line (averages the dense 15-min readings)
+    df = (
+        df.set_index('Date')
+          .resample('1h')
+          .mean()
+          .dropna()
+          .reset_index()
+    )
+
     df['Type'] = 'Pressure'
     return df
 
@@ -157,15 +183,16 @@ else:
     for tab, river in zip(tabs, tab_list):
         with tab:
             if river == "About":
-                st.write("The **River Dipstick** is built by a Lancashire fly fisherman primarily for himself and other local legends.")
+                # === ABOUT PAGE ===
+                st.write("The **River Dipstick** is built by a Lancashire fly fisherman primarly for himself and other local legends.")
                 st.write("All data is sourced from the EA and SEPA public API's.")
                 st.markdown("### Features")
-                st.write("- Access the sidebar by selecting the menu >> in the top lefthand corner of the site")
-                st.write("- Select 'Find G Spot' to highlight good fishing levels")
-                st.write("- Select 'Rainfall History' to view recent rainfall data")
-                st.write("- Use the 'Graph History' slider to show more or less data")
+                st.write("- Access the sidebar by selecting the menu >> in the top lefthand corner of the site\n- Select 'Find G Spot' to highlight good fishing levels on selected charts, based on local wisdom (where it exists)\n- When viewing the 'Good Fishing Band' on a chart; remember... a falling river is always best\n- Select 'Predict Level' for space to eyeball trends\n- Select 'Rainfall History' to view recent rainfall data\n- Select 'Maps' to see where the measuring station is located\n- Use the 'Graph History' slider to show more or less data on the charts\n- **Don't spend too long looking at data, if in doubt... go fishing** 😊")
                 st.markdown("### Tech")
                 st.write("100% open source - [https://github.com/TimLanigan/river-dipstick]")
+                st.write("Built with Streamlit • PostgreSQL • Altair • Docker")
+                st.markdown("### Feedback")
+                st.write("Coming Soon")
                 continue
 
             # === NORMAL RIVER TAB ===
@@ -218,14 +245,14 @@ else:
                 if show_pressure:
                     if not pressure_df.empty:
                         chart_data = pd.concat([chart_data, pressure_df], ignore_index=True)
-                        legend_items.append(("Pressure", "#00b4d8"))
+                        legend_items.append(("Pressure", "#9ca3af"))
                     else:
                         st.caption("No pressure data available yet for this river")
 
                 # === EXTEND CHART (Eyeball Future) ===
                 if show_predictions and not chart_data.empty:
                     last_date = chart_data['Date'].max()
-                    future_dates = pd.date_range(start=last_date, periods=2, freq='D')
+                    future_dates = pd.date_range(start=last_date, periods=2, freq='d')
                     future_df = pd.DataFrame({
                         'Date': future_dates,
                         'Level (metres)': [None] * len(future_dates),
@@ -234,27 +261,89 @@ else:
                     chart_data = pd.concat([chart_data, future_df], ignore_index=True)
                     legend_items.append(("Eyeball Future", "#9e9e9e"))
 
-                # === MAIN LEVEL LINE ===
-                level_line = alt.Chart(chart_data).mark_line(strokeWidth=4).encode(
-                    x=alt.X('Date:T', title='Date', axis=alt.Axis(format='%b %d', tickCount=14)),
-                    y=alt.Y('Level (metres):Q', axis=alt.Axis(title='Level (m)', titleColor='white')),
-                    color=alt.Color('Type:N', scale=alt.Scale(domain=[x[0] for x in legend_items], range=[x[1] for x in legend_items]), legend=None),
-                    strokeDash=alt.condition(alt.datum.Type == REAL_LABEL, alt.value([0]), alt.value([6,4])),
-                    tooltip=[
-                        alt.Tooltip('Date:T', title='Date', format='%d-%m-%Y @ %H:%M'),
-                        alt.Tooltip('Level (metres):Q', title='Level (metres)', format='.3f')
-                    ]
-                ).transform_filter(alt.FieldOneOfPredicate(field='Type', oneOf=[x[0] for x in legend_items if 'Rainfall' not in x[0]]))
+                # === CORE LEVEL LINE (the important fishing signal) ===
+                # Mild smoothing via Altair transform_window to reduce gauge jitter
+                # (especially visible on low-flow stations like Great Musgrave Bridge)
+                # while keeping the overall shape and timing honest.
+                # frame=[-2, 2] = 5-point centered moving average (light touch).
+                # Tooltips still show the raw 'Level (metres)' value for accuracy.
+                LEVEL_SMOOTH_WINDOW = [-2, 2]
 
-                # === FINAL CHART ===
-                chart = level_line
-                if show_rain and not rain_df.empty:
-                    rain_bars = alt.Chart(chart_data).mark_bar(opacity=0.1, size=5).encode(
+                level_line = (
+                    alt.Chart(chart_data)
+                    .transform_filter(alt.datum.Type == REAL_LABEL)
+                    .transform_window(
+                        smoothed_level='mean(Level (metres))',
+                        frame=LEVEL_SMOOTH_WINDOW
+                    )
+                    .mark_line(strokeWidth=4)
+                    .encode(
+                        x=alt.X('Date:T', title='Date', axis=alt.Axis(format='%b %d', tickCount=14)),
+                        y=alt.Y('smoothed_level:Q', axis=alt.Axis(title='Level (m)', titleColor='white')),
+                        color=alt.value("#ad36eeff"),
+                        tooltip=[
+                            alt.Tooltip('Date:T', title='Date', format='%d-%m-%Y @ %H:%M'),
+                            alt.Tooltip('Level (metres):Q', title='Level (metres) (raw)', format='.3f')
+                        ]
+                    )
+                )
+
+                # === GOOD FISHING BAND (static from rules.json) ===
+                band_layer = None
+                if show_sweet_spot:
+                    sid = station['id']
+                    if sid in RULES:
+                        rule = RULES[sid]
+                        if 'good_min' in rule and 'good_max' in rule:
+                            band_df = pd.DataFrame({
+                                'Date': [chart_data['Date'].min(), chart_data['Date'].max()],
+                                'ymin': [rule['good_min'], rule['good_min']],
+                                'ymax': [rule['good_max'], rule['good_max']]
+                            })
+                            band_layer = alt.Chart(band_df).mark_rect(
+                                color='#22c55e',   # nice green
+                                opacity=0.16
+                            ).encode(
+                                x='Date:T',
+                                y=alt.Y('ymin:Q'),
+                                y2=alt.Y2('ymax:Q')
+                            )
+                            legend_items.append(("Good Band", "#22c55e"))
+
+                # Start building the final layered chart
+                if band_layer is not None:
+                    chart = alt.layer(band_layer, level_line)
+                else:
+                    chart = level_line
+
+                # === PRESSURE TREND (dual Y-axis on the right) ===
+                if show_pressure and not pressure_df.empty:
+                    pressure_line = alt.Chart(chart_data).mark_line(
+                        strokeWidth=1.8,
+                        opacity=0.65
+                    ).encode(
                         x=alt.X('Date:T'),
-                        y=alt.Y('Rainfall (mm):Q', axis=alt.Axis(title='Rain (mm)', titleColor='white')),
+                        y=alt.Y('Pressure:Q',
+                                axis=alt.Axis(title='Pressure (hPa)', titleColor='#9ca3af', orient='right'),
+                                scale=alt.Scale(zero=False)
+                        ),
+                        color=alt.value("#9ca3af"),
+                        tooltip=[
+                            alt.Tooltip('Date:T', title='Date', format='%d-%m-%Y @ %H:%M'),
+                            alt.Tooltip('Pressure:Q', title='Pressure (hPa)', format='.1f')
+                        ]
+                    ).transform_filter(alt.datum.Type == 'Pressure')
+
+                    chart = alt.layer(chart, pressure_line).resolve_scale(y='independent')
+
+                # === RAINFALL BARS (dual axis, existing behaviour) ===
+                if show_rain and not rain_df.empty:
+                    rain_bars = alt.Chart(chart_data).mark_bar(opacity=0.12, size=4).encode(
+                        x=alt.X('Date:T'),
+                        y=alt.Y('Rainfall (mm):Q', axis=alt.Axis(title='Rain (mm)', titleColor='lightblue')),
                         color=alt.value('lightblue')
                     ).transform_filter(alt.datum.Type == 'Rainfall')
-                    chart = alt.layer(level_line, rain_bars).resolve_scale(y='independent')
+                    chart = alt.layer(chart, rain_bars).resolve_scale(y='independent')
 
                 # === LEGEND + CHART ===
                 if len(legend_items) == 1:
