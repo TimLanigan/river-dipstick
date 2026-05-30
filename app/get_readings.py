@@ -60,7 +60,6 @@ def api_get(url, params=None, timeout=10):
             time.sleep(5)
     return None
 
-# EA Level
 def get_ea_latest_level(station_id):
     url = f"https://environment.data.gov.uk/flood-monitoring/id/stations/{station_id}/readings"
     data = api_get(url, {"latest": "", "parameter": "level"})
@@ -69,7 +68,6 @@ def get_ea_latest_level(station_id):
         return item.get('value'), item.get('dateTime')
     return None, None
 
-# EA Rainfall - Critical for original stations
 def get_ea_latest_rainfall(station_id):
     url = f"https://environment.data.gov.uk/flood-monitoring/id/stations/{station_id}/readings"
     data = api_get(url, {"latest": "", "parameter": "rainfall"})
@@ -78,7 +76,6 @@ def get_ea_latest_rainfall(station_id):
         return item.get('value'), item.get('dateTime')
     return None, None
 
-# SEPA Level
 def get_sepa_latest_level(station_id):
     url = "https://timeseries.sepa.org.uk/KiWIS/KiWIS"
     params = {
@@ -153,7 +150,6 @@ if __name__ == "__main__":
     logger.info("=== Starting 15-min collection (EA + SEPA) ===")
     logger.info(f"Loaded {len(STATIONS)} rivers from reference")
 
-    # Explicit list of SEPA stations (no rainfall available)
     SEPA_STATIONS = {"133148", "133170", "133176", "506155"}
 
     for river, stations in STATIONS.items():
@@ -179,7 +175,6 @@ if __name__ == "__main__":
                 logger.info(f" SUCCESS: {label} = {level:.3f}m")
                 insert_reading(sid, river_name, label, level, ts)
 
-                # Rainfall collection - only for original EA stations
                 if rainfall_id and sid not in SEPA_STATIONS:
                     rain_value, rain_ts = get_ea_latest_rainfall(rainfall_id)
                     if rain_value is not None:
@@ -192,5 +187,63 @@ if __name__ == "__main__":
                 logger.warning(f" NO DATA for {label} ({sid}) from {source}")
 
             time.sleep(1)
+
+#=== PRESSURE COLLECTION (Current + 2-day Forecast) ===
+    try:
+        for river, stations in STATIONS.items():
+            if not stations:
+                continue
+            rep_station = stations[0]
+            lat = rep_station.get('lat')
+            lon = rep_station.get('lon')
+            if not lat or not lon:
+                continue
+
+            conn = psycopg2.connect(CONNECTION_STRING)
+            cur = conn.cursor()
+
+            # Clear old forecast data for this river FIRST
+            cur.execute("DELETE FROM pressure_forecasts WHERE river = %s AND is_forecast = TRUE", (river,))
+
+            # Current pressure (long-term)
+            url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=pressure_msl&timezone=Europe/London"
+            r = requests.get(url, timeout=15)
+            if r.status_code == 200:
+                data = r.json()
+                pressure = data["current"].get("pressure_msl")
+                timestamp = datetime.now(UTC).isoformat()
+                if pressure:
+                    cur.execute("""
+                        INSERT INTO pressure_forecasts (river, forecast_date, pressure_hpa, is_forecast)
+                        VALUES (%s, %s, %s, FALSE)
+                        ON CONFLICT (river, forecast_date) 
+                        DO UPDATE SET pressure_hpa = EXCLUDED.pressure_hpa
+                    """, (river, timestamp, pressure))
+                    logger.info(f"Updated current pressure for {river}: {pressure} hPa")
+
+            # 2-day forecast (ephemeral)
+            url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&hourly=pressure_msl&timezone=Europe/London&forecast_days=2"
+            r = requests.get(url, timeout=15)
+            if r.status_code == 200:
+                data = r.json()
+                hourly = data.get("hourly", {})
+                times = hourly.get("time", [])
+                pressures = hourly.get("pressure_msl", [])
+
+                inserted = 0
+                for i in range(len(times)):
+                    cur.execute("""
+                        INSERT INTO pressure_forecasts (river, forecast_date, pressure_hpa, is_forecast)
+                        VALUES (%s, %s, %s, TRUE)
+                    """, (river, times[i], pressures[i]))
+                    inserted += 1
+                logger.info(f"Updated 2-day pressure forecast for {river} ({inserted} points)")
+            else:
+                logger.warning(f"Failed to fetch forecast for {river}")
+
+            conn.commit()
+            conn.close()
+    except Exception as e:
+        logger.warning(f"Failed to fetch pressure data: {e}")
 
     logger.info("=== Collection complete ===")

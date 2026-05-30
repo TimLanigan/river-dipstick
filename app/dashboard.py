@@ -52,7 +52,8 @@ load_css("style.css")
 with st.sidebar:
     st.markdown("""<h2 class="site-title">River Dipstick</h2>""", unsafe_allow_html=True)
     show_sweet_spot = st.toggle("Find G Spot", value=False, help="Highlight good fishing levels at key stations")
-    show_predictions = st.toggle("Predict Level", value=False, help="Use Mk1 eyeball to predict level")
+    show_predictions = st.toggle("Extend Chart", value=False, help="Use Mk1 eyeball to predict level")
+    show_pressure = st.toggle("Pressure Trend", value=False, help="Show pressure history + forecast")
     show_rain = st.toggle("Rain History", value=False, help="Show historic rainfall on the chart")
     show_map = st.toggle("View maps", value=False, help="Show measuring station")
     st.markdown("---")
@@ -102,22 +103,6 @@ def get_historical_data(station_id, days=7):
         df['Type'] = REAL_LABEL
     return df
 
-def get_predictions(station_id, days=selected_days):
-    conn = psycopg2.connect(CONNECTION_STRING)
-    start = (datetime.now(UTC) - timedelta(days=days)).isoformat()
-    df = pd.read_sql_query("""
-        SELECT predicted_for, predicted_level FROM predictions
-        WHERE station_id = %s AND predicted_for >= %s
-        ORDER BY predicted_for
-    """, conn, params=(station_id, start))
-    conn.close()
-    if not df.empty:
-        df['predicted_for'] = pd.to_datetime(df['predicted_for'])
-        df['predicted_for'] = df['predicted_for'].apply(to_uk_time)
-        df = df.rename(columns={'predicted_for': 'Date', 'predicted_level': 'Level (metres)'})
-        df['Type'] = 'Predicted'
-    return df
-
 def get_rainfall_data(station_id, days=selected_days):
     conn = psycopg2.connect(CONNECTION_STRING)
     start = (datetime.now(UTC) - timedelta(days=days)).isoformat()
@@ -131,6 +116,26 @@ def get_rainfall_data(station_id, days=selected_days):
         df['timestamp'] = pd.to_datetime(df['timestamp'])
         df = df.rename(columns={'timestamp': 'Date', 'rainfall_mm': 'Rainfall (mm)'})
         df['Type'] = 'Rainfall'
+    return df
+
+def get_pressure_data(river, days=selected_days):
+    """Fetch historic + forecast pressure for a river"""
+    conn = psycopg2.connect(CONNECTION_STRING)
+    start = (datetime.now(UTC) - timedelta(days=days)).isoformat()
+    df = pd.read_sql_query("""
+        SELECT forecast_date as Date, pressure_hpa as Pressure
+        FROM pressure_forecasts
+        WHERE river = %s AND forecast_date >= %s
+        ORDER BY forecast_date
+    """, conn, params=(river, start))
+    conn.close()
+    
+    if df.empty:
+        return pd.DataFrame(columns=['date', 'Pressure', 'Type'])
+    
+    df = df.copy()
+    df['Date'] = pd.to_datetime(df['date']).apply(to_uk_time)
+    df['Type'] = 'Pressure'
     return df
 
 # === AUTO REFRESH ===
@@ -164,9 +169,8 @@ else:
                 continue
 
             # === NORMAL RIVER TAB ===
-            stations = STATIONS.get(river, [])   # Uses improved ordering from river_reference.py
+            stations = STATIONS.get(river, [])
             river_df = df[df['river'] == river].copy()
-
             if river_df.empty:
                 st.write("No data.")
                 continue
@@ -208,6 +212,27 @@ else:
                         legend_items.append((" Rainfall", "lightblue"))
                     else:
                         st.caption("No rainfall data available for this station")
+
+                # Pressure Trend
+                pressure_df = get_pressure_data(river, days=selected_days)
+                if show_pressure:
+                    if not pressure_df.empty:
+                        chart_data = pd.concat([chart_data, pressure_df], ignore_index=True)
+                        legend_items.append(("Pressure", "#00b4d8"))
+                    else:
+                        st.caption("No pressure data available yet for this river")
+
+                # === EXTEND CHART (Eyeball Future) ===
+                if show_predictions and not chart_data.empty:
+                    last_date = chart_data['Date'].max()
+                    future_dates = pd.date_range(start=last_date, periods=2, freq='D')
+                    future_df = pd.DataFrame({
+                        'Date': future_dates,
+                        'Level (metres)': [None] * len(future_dates),
+                        'Type': ['Eyeball Future'] * len(future_dates)
+                    })
+                    chart_data = pd.concat([chart_data, future_df], ignore_index=True)
+                    legend_items.append(("Eyeball Future", "#9e9e9e"))
 
                 # === MAIN LEVEL LINE ===
                 level_line = alt.Chart(chart_data).mark_line(strokeWidth=4).encode(
