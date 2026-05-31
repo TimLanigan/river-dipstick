@@ -184,15 +184,32 @@ else:
         with tab:
             if river == "About":
                 # === ABOUT PAGE ===
-                st.write("The **River Dipstick** is built by a Lancashire fly fisherman primarly for himself and other local legends.")
-                st.write("All data is sourced from the EA and SEPA public API's.")
+                st.write("The **River Dipstick** is built by a Lancashire fly fisherman primarily for himself and other local legends.")
+
                 st.markdown("### Features")
-                st.write("- Access the sidebar by selecting the menu >> in the top lefthand corner of the site\n- Select 'Find G Spot' to highlight good fishing levels on selected charts, based on local wisdom (where it exists)\n- When viewing the 'Good Fishing Band' on a chart; remember... a falling river is always best\n- Select 'Predict Level' for space to eyeball trends\n- Select 'Rainfall History' to view recent rainfall data\n- Select 'Maps' to see where the measuring station is located\n- Use the 'Graph History' slider to show more or less data on the charts\n- **Don't spend too long looking at data, if in doubt... go fishing** 😊")
+                st.write("- Access the sidebar by selecting the menu >> in the top lefthand corner of the site\n- Select 'Find G Spot' to highlight good fishing levels on selected charts, based on local wisdom (where it exists)\n- When viewing the 'Good Fishing Band' on a chart; remember... a falling river is always best\n- Select 'Extend Chart' for space to eyeball trends\n- Select 'Pressure Trend' to stitch together recent pressure readings with forecasted atmospheric pressure\n- Select 'Rainfall History' to view recent rainfall data\n- Select 'Maps' to see where the measuring station is located\n- Use the 'Graph History' slider to show more or less data on the charts\n- **Don't spend too long looking at data, if in doubt... go fishing** 😊")
+
+                st.markdown("### Data Sources")
+                st.write("- **Environment Agency (EA)** – Real-time river levels and rainfall")
+                st.write("- **SEPA** – Real-time river levels (Scotland)")
+                st.write("- **Open-Meteo** – Atmospheric pressure observations and forecasts")
+
+                st.markdown("### Blog")
+                st.write("Fishing reports, river notes, and the occasional adventure at [downstreamblog.uk](https://downstreamblog.uk/)")
+
                 st.markdown("### Tech")
                 st.write("100% open source - [https://github.com/TimLanigan/river-dipstick]")
                 st.write("Built with Streamlit • PostgreSQL • Altair • Docker")
+
                 st.markdown("### Feedback")
-                st.write("Coming Soon")
+
+                st.write("If something’s broken or you’ve got a suggestion for new feature that might be useful for us fishing nerds, let me know.")
+
+                st.link_button(
+                    "Give Feedback",
+                    "https://tally.so/r/rjvdK2",
+                    use_container_width=True
+                )
                 continue
 
             # === NORMAL RIVER TAB ===

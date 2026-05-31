@@ -11,7 +11,7 @@ Real-world testing showed that complex ML predictions were less useful than clea
 - Static "Good Fishing Bands" defined in `rules.json`
 - Clean charts with rainfall overlay
 - The "Extend Chart" toggle for 2-day eyeball forecasting
-- Pressure trend data (work in progress)
+- Pressure trend data (working well with hourly smoothing + dual-axis)
 
 The goal is a fast, reliable answer to "Is it worth going?" with minimal ongoing complexity.
 
@@ -40,31 +40,130 @@ The goal is a fast, reliable answer to "Is it worth going?" with minimal ongoing
 - Verify behavior where practical (check collector logs, inspect dashboard rendering, query the DB, run utilities).
 - The project is intentionally small. Avoid adding new dependencies or significant complexity without strong justification.
 
-## Known Technical Debt & Gotchas (as of 30 May 2026)
-- **Pressure Trend feature** (current high-priority work):
-  - Data collection works and is writing to `pressure_forecasts`.
-  - The table exists in the live DB but is **not** created inside `get_readings.py:init_db()`.
-  - `dashboard.py:get_pressure_data()` has a column alias bug (`forecast_date as Date` then references `df['date']`).
-  - Pressure values are concatenated onto the main level chart with no dual-axis handling (unlike rainfall).
-- **"Find G Spot" / Good Fishing Bands**:
-  - Toggle exists in the sidebar.
-  - `rules.json` contains `good_min`/`good_max` for several stations.
-  - README documents it as a shipped feature.
-  - **No rendering logic currently exists** in `dashboard.py`.
+## Known Technical Debt & Gotchas (as of June 2026)
+
+**Still relevant:**
 - Connection strings are duplicated between files and hardcoded to Docker service names (`wintermute-db` / `db`).
 - Auto-refresh uses a blunt 60-second full `st.rerun()`.
-- Several log files and old utility scripts reference retired ML / G-Spot systems (harmless but noisy).
+- Several log files and old utility scripts reference retired ML / dynamic G-Spot systems (harmless but noisy).
+
+**Recently resolved (May–June 2026):**
+- Pressure Trend feature (dual-axis + hourly smoothing) — working well
+- Good Fishing Band rendering — restored and functional
+- Default Streamlit favicon — replaced with custom favicon support
+- Ghostty + tmux clipboard — resolved with OSC52 + Ghostty settings (see section below)
 
 ## Long-term Direction
 See `riverdipstick_tasks.md` (High Priority / Medium Priority / Backlog sections) and the Future Plans section of `README.md`.
 
-Current focus: Finish the Pressure Trend feature properly, test toggle interactions, then deploy.
+Current focus: Test and polish interactions between all toggles (Pressure, Rain, Good Band, Extend Chart), then move into longer-term DX and infrastructure improvements (Ansible, home lab server).
 
 ## General Working Style
 - Be direct and concise.
 - Flag anything that would increase long-term maintenance burden.
 - When in doubt, favor the simplest solution that delivers value to the angler at the riverbank.
 - Keep documentation (especially the task list) in sync with reality.
+
+## Deployment / Production Workflow
+
+**Live server details (as of June 2026):**
+- Hostname: `ubuntu`
+- User: `root`
+- Project path: `/opt/river-dipstick`
+- Connection method (current): VSCode embedded terminal (found to be more reliable than plain Ghostty + tmux for clipboard)
+- Git remote: `https://github.com/TimLanigan/river-dipstick.git`
+
+**Standard deployment steps (manual) — observed May 2026:**
+1. Connect to live server (currently using VSCode embedded terminal — found more reliable for clipboard than Ghostty + tmux)
+2. `cd /opt/river-dipstick`
+3. `git status` — expect "working tree clean" + "behind by X commits"
+4. `git pull` (fast-forward when possible)
+5. Restart services:
+   - For pure code changes (most common case): `docker-compose restart dashboard` (or `docker-compose up -d dashboard`)
+   - Full rebuild only needed for dependency or Dockerfile changes: `docker-compose up -d --build`
+   - Collector can usually be restarted separately if needed: `docker-compose restart collector`
+6. Verify:
+   - `docker ps`
+   - Hard refresh the live site (important after code changes)
+   - Check https://riverdipstick.uk
+   - Optionally check collector logs: `docker logs -f wintermute-collector`
+
+**Important observation:**
+- The `dashboard` service has `./app:/app` volume mounted, so most Python changes (including dashboard.py and get_readings.py) are picked up without a full image rebuild.
+- A simple `docker compose restart dashboard` is often sufficient after `git pull`.
+
+**Critical workflow note:**
+- The project uses the modern Docker Compose plugin: `docker compose` (no hyphen), **not** the old standalone `docker-compose`.
+- Always use `docker compose` on both dev and live servers.
+
+**Notes for future Ansible migration:**
+- ✅ Initial Ansible structure created under `ansible/` (inventory, playbooks, roles)
+- ✅ Basic `playbooks/deploy.yml` that performs git operations + conditional `docker compose` restart/rebuild
+- Use `ansible-playbook playbooks/deploy.yml -l live -e "version=main" --ask-vault-pass` from dev machine after `git push`
+- Deployment is currently fully manual on live (being replaced).
+- No automated health checks or rollback yet.
+- Services are managed via `docker compose` (not systemd).
+- Would benefit from:
+  - Idempotent playbook for `git pull + restart` (in progress)
+  - Separate handling for code changes vs image rebuilds (basic logic in v1 playbook)
+  - Basic verification steps after deploy (containers healthy + site check)
+  - Full server provisioning roles (Docker, users, firewall) in future iterations
+
+See `ansible/README.md` for quick start and current status.
+
+**Ghostty + Tmux Copy/Paste Setup (Confirmed Working — June 2026)**
+
+The user uses **Ghostty** as their main terminal on macOS and runs tmux on remote Linux servers (dev + live). They are happy with Ghostty overall.
+
+Native copy/paste was previously unreliable until the following setup was applied.
+
+**Working configuration:**
+
+**Ghostty (macOS side) — `~/.config/ghostty/config`:**
+```ini
+copy-on-select = clipboard
+clipboard-read = allow
+clipboard-write = allow
+```
+
+**tmux (remote server side) — `~/.tmux.conf`:**
+```tmux
+set -g allow-passthrough on
+set -g set-clipboard on
+```
+
+**After making changes:**
+- Fully restart Ghostty (changes don't apply to existing windows).
+- Inside an existing tmux session: `tmux source-file ~/.tmux.conf`
+
+This combination enables reliable OSC52 clipboard passthrough, which works very well with Ghostty. The user is happy with Ghostty overall and intends to keep using it.
+
+**Tip for future machines:** These are the minimal settings needed for good copy-paste when using Ghostty + tmux over SSH.
+
+**Notes:**
+- Always pull on live only after changes have been pushed from dev.
+- Prefer small, focused deploys when possible.
+- Update this section in AGENTS.md after any significant changes to the deployment process.
+
+---
+
+## Handoff Note – June 2026
+
+Homelab infrastructure, Ansible learning, and general homelab management work has moved to a separate repository and agent context:
+
+**Homelab repo location on management node:** `~/homelab` (on the `homelab-mgmt` LXC)
+
+All future work related to:
+- Homelab architecture
+- Ansible training course and automation
+- Obsidian vault as a service
+- Multi-server / Proxmox strategies
+
+...should be discussed in the homelab agent context (by running `grok` from inside `~/homelab` on the management node).
+
+This separation exists to prevent context pollution between the River Dipstick application work and broader homelab infrastructure work.
+
+This file (River Dipstick AGENTS.md) should now stay focused on the application itself.
 
 ---
 

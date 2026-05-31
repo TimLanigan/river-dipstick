@@ -2,28 +2,29 @@
 
 **Living document.** This is the single source of truth for work on the project. Keep it updated as we discover issues, complete items, or identify new goals.
 
-Last updated: 30 May 2026
+Last updated: June 2026
 
 ---
 
 ## High Priority (Current Focus)
 
-- Finish Pressure Trend feature
-  - ~~Fix column alias bug in `get_pressure_data()` (dashboard.py)~~ ✅
-  - ~~Add proper dual-axis handling for pressure (right-hand Y axis)~~ ✅
-  - ~~Create `pressure_forecasts` table in `init_db()` so the schema is reproducible~~ ✅
-  - ~~Smooth the pressure line~~ ✅ (hourly resampling of historical + forecast data for continuous clean trend)
-  - ~~Basic styling polish on pressure line~~ ✅ (thinner, solid, more subtle grey)
-  - ~~Add mild Altair transform_window smoothing to main level line~~ ✅ (5-point centered MA via transform_window, raw values kept in tooltips)
+**Recently completed (May–June 2026):**
+- Pressure Trend feature (dual-axis + hourly smoothing)
+- Main river level line mild smoothing (Altair transform_window)
+- Good Fishing Bands restored
+- Custom favicon + Ghostty + tmux clipboard fixes
+- Successful deploy to LIVE
+
+---
+
+- Pressure Trend + Level Line Polish (remaining items)
   - Test full interaction between Pressure Trend + Extend Chart + Rain History toggles + Good Band
-  - Evaluate smoothing strength on noisy low-flow stations (e.g. Great Musgrave) vs moving periods
+  - Evaluate current smoothing strength on noisy low-flow stations (e.g. Great Musgrave) vs moving periods
   - Final visual tweaks if needed when all overlays are active
 
-- ~~Good Fishing Bands (Find G Spot)~~ ✅ — Static green band is working on dev (as of 30 May)
-  - Logic is present and rendering the rect from rules.json when toggle is active
-  - Minor styling differences vs the version in af74cf0 (we can align if desired)
+- ~~Good Fishing Bands (Find G Spot)~~ ✅ — Fully working (June 2026)
 
-- Once pressure feature + good bands are stable: commit, deploy to LIVE, and update task list
+- ~~Once pressure feature + good bands are stable: commit, deploy to LIVE, and update task list~~ ✅ (Successfully deployed to live June 2026)
 
 ---
 
@@ -89,14 +90,16 @@ Last updated: 30 May 2026
   - Document the new server role vs the existing "wintermute" home dev server and the Fasthost VPS
 
 - Ansible automation initiative
-  - Start an `ansible/` directory in the repo (or separate repo)
+  - ✅ Started `ansible/` directory in the repo
+  - ✅ Basic inventory + deploy playbook created (git pull + docker compose restart/rebuild)
   - Create playbooks/roles for:
     - Base server hardening + Docker installation
     - PostgreSQL setup (dev + prod patterns)
-    - Deploying the full River Dipstick stack (with secrets management)
+    - Deploying the full River Dipstick stack (with secrets management using ansible-vault)
     - Log rotation, backup jobs, and monitoring setup
   - Move away from manual Docker Compose management on the home server
   - Use Ansible for consistent environment setup between home lab and VPS
+  - Document usage in AGENTS.md (in progress)
 
 - Long-term infrastructure vision
   - Clarify the three environments: Home Lab Dev/Staging, Home "Wintermute" (current), and Fasthost LIVE

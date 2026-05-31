@@ -47,3 +47,8 @@ data/station_coords_cache.json
 
 # Anything you throw in a trash folder while testing
 trash/
+
+# Ansible
+ansible/.vault_pass
+ansible/group_vars/*/vault.yml
+*.retry
