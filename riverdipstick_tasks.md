@@ -1,12 +1,23 @@
 # River Dipstick Task List
 
-**Living document.** This is the single source of truth for work on the project. Keep it updated as we discover issues, complete items, or identify new goals.
+**Living document.** Handy for phone / GitHub-connected agents. Keep it updated as we discover issues, complete items, or identify new goals. Private homelab plans live in Obsidian, not here.
 
-Last updated: June 2026
+Last updated: 2026-08-22
 
 ---
 
-## High Priority (Current Focus)
+## Current status (August 2026)
+
+- **1.0 is live** at https://riverdipstick.uk (Fasthost VPS, docker compose). Leave it as 1.0.
+- **1.0 working copy** now runs on the dedicated home Ubuntu box (skynet3): clone of this repo, local postgres, collector on a 15-minute loop. Dashboard bound to localhost (SSH tunnel to view). Fresh DB + 7-day EA/SEPA backfill — not a clone of the live database.
+- Old Proxmox/home-dev boxes (skynet1/skynet2) are being retired. Do not treat them as the dev environment.
+- **v2 is not started** in this repo. Do not begin a rewrite until 1.0-on-skynet3 is trusted and the fishing blog has a docker home (see private notes).
+- Git from skynet3 uses SSH (`git@github.com:TimLanigan/river-dipstick.git`).
+
+**Recently completed (August 2026):**
+- Pandas 3 datetime crash on mixed EA `...Z` vs Python `isoformat()` timestamps — `parse_ts(..., format="ISO8601")` in `dashboard.py`. Live does not show this until the image is rebuilt; the fix is for that rebuild.
+- `docker-compose.yml`: log volume `./logs`; dashboard/collector ports `127.0.0.1` (correct behind nginx; stops publishing 8501/8888 on all interfaces).
+- `app/utility/backfill_levels_7d.py` for a fresh DB.
 
 **Recently completed (May–June 2026):**
 - Pressure Trend feature (dual-axis + hourly smoothing)
@@ -16,6 +27,8 @@ Last updated: June 2026
 - Successful deploy to LIVE
 
 ---
+
+## High Priority (Current Focus)
 
 - Pressure Trend + Level Line Polish (remaining items)
   - Test full interaction between Pressure Trend + Extend Chart + Rain History toggles + Good Band
@@ -41,7 +54,7 @@ Last updated: June 2026
   - Review and clean up current `.env` usage across services
 
 - Better dependency management
-  - Pin versions in `requirements.txt` (currently extremely loose)
+  - Pin versions in `requirements.txt` (currently extremely loose — unpinned `pandas` pulled 3.x on a fresh skynet3 image)
   - Consider moving to `pyproject.toml` + pip-tools or uv for reproducibility
 
 - Add a lightweight task runner (e.g. `justfile` or Makefile) for common operations:
@@ -71,8 +84,8 @@ Last updated: June 2026
   - Reduce duplication of DB connection strings and init logic
 
 - Deployment & release process
-  - Document current DEV vs LIVE deployment workflow
-  - Add a simple staging environment (ideally on the new home lab server)
+  - Document current skynet3 (1.0 working copy) vs LIVE (VPS) workflow
+  - skynet3 now *is* the home 1.0 copy — treat it as such, not as a third mystery environment
   - Consider basic CI (even GitHub Actions lint + build check)
 
 - Backup & recovery
@@ -84,10 +97,9 @@ Last updated: June 2026
 ## Infrastructure & Automation (Medium Term Strategic Goals)
 
 - Home lab server project
-  - Procure and install new dedicated dev/staging server in the home lab
-  - Decide on hardware (Mini PC? Used enterprise? NUC-style?)
-  - Set up Proxmox or plain Debian/Ubuntu base OS
-  - Document the new server role vs the existing "wintermute" home dev server and the Fasthost VPS
+  - ~~Procure and install new dedicated dev/staging server~~ ✅ skynet3 (Ubuntu, bare metal) is the 1.0 working copy
+  - ~~Decide on hardware / Proxmox vs Ubuntu~~ ✅ Ubuntu only. Old Proxmox nodes to be powered off once 1.0-on-skynet3 is trusted
+  - Document skynet3 vs Fasthost LIVE (1.0). Do not revive the Proxmox cluster for this app
 
 - Ansible automation initiative
   - ✅ Started `ansible/` directory in the repo
@@ -102,12 +114,12 @@ Last updated: June 2026
   - Document usage in AGENTS.md (in progress)
 
 - Long-term infrastructure vision
-  - Clarify the three environments: Home Lab Dev/Staging, Home "Wintermute" (current), and Fasthost LIVE
-  - Define promotion pipeline (home lab → home dev → VPS)
-  - Evaluate whether the current home dev server can be repurposed or retired
+  - Two environments that matter: **skynet3 1.0 copy** and **Fasthost LIVE 1.0**
+  - Promote: git push from skynet3 → git pull + compose restart on LIVE
+  - Old home-dev / Proxmox path: retire, do not rebuild
 
 - Related side project
-  - Mini PC integration into Proxmox cluster (already noted in backlog)
+  - Mini PC / leftover disks as backup later — low priority, not Proxmox
 
 ---
 
@@ -125,6 +137,7 @@ Last updated: June 2026
 
 - ~~"Find G Spot" toggle + `rules.json` had broken/missing rendering~~ ✅ (working on dev as of 30 May)
 - ~~Default Streamlit favicon showing on bookmarks~~ ✅ (working in Chrome)
+- ~~Pandas 3 mixed ISO timestamp parse on dashboard~~ ✅ (`format="ISO8601"`, Aug 2026)
 - Hardcoded Docker service names in connection strings (`wintermute-db` vs `db`)
 - Crude 60-second full-page auto-refresh in Streamlit
 - Multiple references in logs and old scripts to retired ML / dynamic G-Spot systems (cleanup)

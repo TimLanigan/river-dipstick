@@ -31,7 +31,7 @@ services:
     env_file:
       - .env
     ports:
-      - "8501:8501"
+      - "127.0.0.1:8501:8501"
     volumes:
       - ./app:/app
       - ./app/data:/app/data
@@ -51,9 +51,9 @@ services:
       - ./app:/app
       - ./app/data:/app/data
       - ./notebooks:/app/notebooks
-      - /opt/river-dipstick/logs:/app/logs
+      - ./logs:/app/logs
     ports:
-      - "8888:8888"
+      - "127.0.0.1:8888:8888"
 
 volumes:
   postgres_data:

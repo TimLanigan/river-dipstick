@@ -31,10 +31,15 @@ CONNECTION_STRING = f'postgresql://river_user:{DB_PASS}@wintermute-db:5432/river
 REAL_LABEL = "Measured Level"
 
 # UK Timezone helper
+# Pandas 2.2+/3 infers one format for the whole column. Collector stores a mix
+# of "...00Z" (EA) and "...00.123456+00:00" (isoformat). ISO8601 accepts both.
+def parse_ts(value):
+    return pd.to_datetime(value, utc=True, format="ISO8601")
+
 def to_uk_time(utc_dt):
     uk_tz = pytz.timezone('Europe/London')
     if isinstance(utc_dt, str):
-        utc_dt = pd.to_datetime(utc_dt)
+        utc_dt = parse_ts(utc_dt)
     if utc_dt.tzinfo is None:
         utc_dt = utc_dt.tz_localize('UTC')
     return utc_dt.tz_convert(uk_tz)
@@ -98,7 +103,7 @@ def get_latest_readings():
         ORDER BY station_id, timestamp DESC
     """, conn)
     conn.close()
-    df['timestamp'] = pd.to_datetime(df['timestamp'])
+    df['timestamp'] = parse_ts(df['timestamp'])
     return df
 
 def get_historical_data(station_id, days=7):
@@ -112,7 +117,7 @@ def get_historical_data(station_id, days=7):
     """, conn, params=(station_id, start))
     conn.close()
     if not df.empty:
-        df['timestamp'] = pd.to_datetime(df['timestamp'])
+        df['timestamp'] = parse_ts(df['timestamp'])
         df['timestamp'] = df['timestamp'].apply(to_uk_time)
         df = df.rename(columns={'timestamp': 'Date', 'level': 'Level (metres)'})
         df['Type'] = REAL_LABEL
@@ -128,7 +133,7 @@ def get_rainfall_data(station_id, days=selected_days):
     """, conn, params=(station_id, start))
     conn.close()
     if not df.empty:
-        df['timestamp'] = pd.to_datetime(df['timestamp'])
+        df['timestamp'] = parse_ts(df['timestamp'])
         df = df.rename(columns={'timestamp': 'Date', 'rainfall_mm': 'Rainfall (mm)'})
         df['Type'] = 'Rainfall'
     return df
@@ -150,7 +155,7 @@ def get_pressure_data(river, days=selected_days):
     
     df = df.copy()
     df = df.rename(columns={'forecast_date': 'Date', 'pressure_hpa': 'Pressure'})
-    df['Date'] = pd.to_datetime(df['Date']).apply(to_uk_time)
+    df['Date'] = parse_ts(df['Date']).apply(to_uk_time)
 
     # Resample to hourly for a smooth continuous line (averages the dense 15-min readings)
     df = (
